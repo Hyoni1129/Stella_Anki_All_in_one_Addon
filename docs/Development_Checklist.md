@@ -2,6 +2,8 @@
 
 A comprehensive checklist for combining the Deck Translator, Image Generator, and Sentence Generator into a single unified Anki add-on.
 
+**Last Updated**: 2026-02-01
+
 ---
 
 ## Table of Contents
@@ -21,10 +23,10 @@ A comprehensive checklist for combining the Deck Translator, Image Generator, an
 ## 1. Project Setup
 
 ### 1.1 Repository Structure
-- [ ] Create new repository for `stella_anki_tools`
-- [ ] Set up directory structure as per architecture plan
-- [ ] Initialize git with `.gitignore` for Python/Anki add-ons
-- [ ] Create `README.md` with project overview
+- [x] Create new repository for `stella_anki_tools`
+- [x] Set up directory structure as per architecture plan
+- [x] Initialize git with `.gitignore` for Python/Anki add-ons
+- [x] Create `README.md` with project overview
 - [ ] Add `LICENSE` file (decide on unified license - see note below)
 
 > [!NOTE]
@@ -43,7 +45,7 @@ A comprehensive checklist for combining the Deck Translator, Image Generator, an
 - [ ] Set up pre-commit hooks
 
 ### 1.3 Documentation Foundation
-- [ ] Create `docs/` directory structure
+- [x] Create `docs/` directory structure
 - [ ] Add `CONTRIBUTING.md`
 - [ ] Add `CHANGELOG.md`
 - [ ] Create API documentation template
@@ -53,10 +55,10 @@ A comprehensive checklist for combining the Deck Translator, Image Generator, an
 ## 2. Core Infrastructure
 
 ### 2.1 Entry Point & Initialization
-- [ ] Create `__init__.py` with proper add-on initialization
-- [ ] Implement lazy loading for feature modules
-- [ ] Set up error handling for initialization failures
-- [ ] Create `meta.json` with unified add-on metadata
+- [x] Create `__init__.py` with proper add-on initialization
+- [x] Implement lazy loading for feature modules
+- [x] Set up error handling for initialization failures
+- [x] Create `meta.json` with unified add-on metadata
 
 ```python
 # __init__.py structure
@@ -74,11 +76,11 @@ if __name__ != "__main__":
 ```
 
 ### 2.2 Configuration System
-- [ ] Design unified configuration schema (see Code_Analysis.md)
-- [ ] Create `config/settings.py` - Settings manager class
+- [x] Design unified configuration schema (see Code_Analysis.md)
+- [x] Create `config/settings.py` - Settings manager class
 - [ ] Implement migration logic from legacy configs
-- [ ] Create default `config.json`
-- [ ] Add config validation with meaningful error messages
+- [x] Create default `config.json`
+- [x] Add config validation with meaningful error messages
 - [ ] Support per-deck configuration overrides
 - [ ] Implement config export/import functionality
 
@@ -100,39 +102,39 @@ if __name__ != "__main__":
 ```
 
 ### 2.3 API Key Management (Unified)
-- [ ] Create `core/api_key_manager.py` merging best practices from all tools
+- [x] Create `core/api_key_manager.py` merging best practices from all tools
 - [ ] Implement encrypted storage using Fernet (from Image Gen)
-- [ ] Implement multi-key rotation (from Translator)
-- [ ] Add automatic cooldown on 429 errors
-- [ ] Track per-key usage statistics
-- [ ] Support key validation testing
-- [ ] Implement secure key masking for UI display
+- [x] Implement multi-key rotation (from Translator)
+- [x] Add automatic cooldown on 429 errors
+- [x] Track per-key usage statistics
+- [x] Support key validation testing
+- [x] Implement secure key masking for UI display
 - [ ] Add key import/export functionality
 
 **Key Features to Implement:**
-| Feature | Source | Priority |
-|---------|--------|----------|
-| Max 15 keys | Translator | High |
-| Encrypted storage | Image Gen | High |
-| Auto-rotation | Translator | High |
-| Usage stats | Both | Medium |
-| 24hr cooldown | Translator | Medium |
-| Key validation | Both | Medium |
+| Feature | Source | Priority | Status |
+|---------|--------|----------|--------|
+| Max 15 keys | Translator | High | ✅ Done |
+| Encrypted storage | Image Gen | High | ⏳ Pending |
+| Auto-rotation | Translator | High | ✅ Done |
+| Usage stats | Both | Medium | ✅ Done |
+| 24hr cooldown | Translator | Medium | ✅ Done |
+| Key validation | Both | Medium | ✅ Done |
 
 ### 2.4 Logging System
-- [ ] Create `core/logger.py` with unified logging
-- [ ] Implement file-based logging with rotation
-- [ ] Add log levels (DEBUG, INFO, WARNING, ERROR)
+- [x] Create `core/logger.py` with unified logging
+- [x] Implement file-based logging with rotation
+- [x] Add log levels (DEBUG, INFO, WARNING, ERROR)
 - [ ] Create log viewer in settings UI
 - [ ] Implement log cleanup for old log files
-- [ ] Add structured logging format for debugging
+- [x] Add structured logging format for debugging
 
 ### 2.5 Gemini Client (Shared)
-- [ ] Create `core/gemini_client.py` as shared API client
+- [x] Create `core/gemini_client.py` as shared API client
 - [ ] Implement connection pooling
-- [ ] Add request rate limiting
-- [ ] Implement retry logic with exponential backoff
-- [ ] Support both text and multimodal responses
+- [x] Add request rate limiting
+- [x] Implement retry logic with exponential backoff
+- [x] Support both text and multimodal responses
 - [ ] Add response caching (optional, for development)
 
 ---
@@ -140,28 +142,28 @@ if __name__ != "__main__":
 ## 3. Translation Module
 
 ### 3.1 Core Translation Logic
-- [ ] Create `translation/__init__.py`
-- [ ] Port `StellaGenerator` to `translation/generator.py`
-- [ ] Port `BatchTranslationWorker` to `translation/batch_processor.py`
+- [x] Create `translation/__init__.py`
+- [x] Port `StellaGenerator` to `translation/translator.py`
+- [x] Port `BatchTranslationWorker` to `translation/batch_translator.py`
 - [ ] Implement `TranslationManager` orchestrator class
-- [ ] Update prompts for translation quality
+- [x] Update prompts for translation quality
 - [ ] Add context-aware translation improvements
 
 ### 3.2 Translation Features
-- [ ] Single-note translation (editor integration)
-- [ ] Batch translation for selected cards
-- [ ] Deck-wide translation with progress
-- [ ] Skip cards with existing translations (configurable)
-- [ ] Overwrite mode for re-translation
-- [ ] Field mapping with auto-detection
+- [x] Single-note translation (editor integration)
+- [x] Batch translation for selected cards
+- [x] Deck-wide translation with progress (via DeckOperationDialog)
+- [x] Skip cards with existing translations (configurable)
+- [x] Overwrite mode for re-translation
+- [x] Field mapping with auto-detection
 
 ### 3.3 Translation Configuration
-- [ ] Source field selection
-- [ ] Context field selection (for disambiguation)
-- [ ] Destination field selection
-- [ ] Target language selection
-- [ ] Model selection (gemini-2.5-flash, etc.)
-- [ ] Batch size and delay settings
+- [x] Source field selection
+- [x] Context field selection (for disambiguation)
+- [x] Destination field selection
+- [x] Target language selection
+- [x] Model selection (gemini-2.5-flash, etc.)
+- [x] Batch size and delay settings
 
 ---
 
@@ -171,18 +173,18 @@ if __name__ != "__main__":
 > This module requires the most significant refactoring as it must be converted from CLI to add-on.
 
 ### 4.1 Core Conversion from CLI
-- [ ] Port `GeminiClient` prompt generator → `image/prompt_generator.py`
-- [ ] Port `NanoBananaClient` → `image/image_generator.py`
-- [ ] Replace AnkiConnect HTTP calls with direct Anki API
-- [ ] Replace file-based image storage with `mw.col.media`
-- [ ] Remove CLI-specific dependencies (colorama, rich, tqdm)
-- [ ] Adapt SQLite workflow to Anki config system
+- [x] Port `GeminiClient` prompt generator → `image/prompt_generator.py`
+- [x] Port `NanoBananaClient` → `image/image_generator.py`
+- [x] Replace AnkiConnect HTTP calls with direct Anki API
+- [x] Replace file-based image storage with `mw.col.media`
+- [x] Remove CLI-specific dependencies (colorama, rich, tqdm)
+- [x] Adapt SQLite workflow to Anki config system
 
 ### 4.2 Anki Media Integration
-- [ ] Create `image/anki_media.py` for media handling
-- [ ] Implement image storage via `mw.col.media.add_file()`
-- [ ] Generate proper `<img>` tags for card fields
-- [ ] Handle image naming conventions
+- [x] Create `image/anki_media.py` for media handling
+- [x] Implement image storage via `mw.col.media.add_file()`
+- [x] Generate proper `<img>` tags for card fields
+- [x] Handle image naming conventions
 - [ ] Implement image cleanup for orphaned media
 
 **AnkiConnect to Direct API Mapping:**
@@ -196,26 +198,26 @@ mw.col.media.add_file(image_path)
 ```
 
 ### 4.3 Image Generation Features
-- [ ] Single-card image generation (editor)
-- [ ] Batch image generation for deck
+- [x] Single-card image generation (editor)
+- [x] Batch image generation for deck (via DeckOperationDialog)
 - [ ] Image prompt preview before generation
-- [ ] Image style presets (anime, photorealistic, etc.)
+- [x] Image style presets (anime, photorealistic, etc.)
 - [ ] Image size optimization for Anki
-- [ ] Progress tracking with cancellation
-- [ ] Skip cards with existing images
+- [x] Progress tracking with cancellation
+- [x] Skip cards with existing images
 
 ### 4.4 Image Configuration
-- [ ] Word field selection
-- [ ] Image field selection
-- [ ] Style preset selection
+- [x] Word field selection
+- [x] Image field selection
+- [x] Style preset selection
 - [ ] Master prompt customization
 - [ ] Image dimensions settings
-- [ ] Rate limiting configuration
+- [x] Rate limiting configuration
 
 ### 4.5 SDK Compatibility
-- [ ] Evaluate `google-genai` vs `google-generativeai` requirements
+- [x] Evaluate `google-genai` vs `google-generativeai` requirements
 - [ ] Bundle necessary SDK components in `lib/`
-- [ ] Handle namespace conflicts with existing packages
+- [x] Handle namespace conflicts with existing packages
 - [ ] Test image generation with chosen SDK
 
 ---
@@ -223,81 +225,97 @@ mw.col.media.add_file(image_path)
 ## 5. Sentence Generation Module
 
 ### 5.1 Core Sentence Logic
-- [ ] Create `sentence/__init__.py`
-- [ ] Port `SentenceGenerator` → `sentence/generator.py`
-- [ ] Port `ProgressStateManager` → `sentence/progress_state.py`
+- [x] Create `sentence/__init__.py`
+- [x] Port `SentenceGenerator` → `sentence/sentence_generator.py`
+- [x] Port `ProgressStateManager` → `sentence/progress_state.py`
 - [ ] Implement resume functionality for interrupted batches
-- [ ] Add word highlighting in generated sentences
+- [x] Add word highlighting in generated sentences
 
 ### 5.2 Sentence Features
-- [ ] Single-note sentence generation (editor)
-- [ ] Batch sentence generation
-- [ ] Difficulty levels (Beginner, Normal, Complex)
-- [ ] Sentence + translation pair generation
+- [x] Single-note sentence generation (editor)
+- [x] Batch sentence generation (via DeckOperationDialog)
+- [x] Difficulty levels (Beginner, Normal, Complex)
+- [x] Sentence + translation pair generation
 - [ ] Resume from last position
 - [ ] Error recovery with retry queue
 
 ### 5.3 Sentence Configuration
-- [ ] Expression field selection
-- [ ] Sentence field selection
-- [ ] Translation field selection
-- [ ] Difficulty level selection
-- [ ] Language selection
+- [x] Expression field selection
+- [x] Sentence field selection
+- [x] Translation field selection
+- [x] Difficulty level selection
+- [x] Language selection
 - [ ] Auto-generate toggle
 
 ---
 
 ## 6. UI/UX Integration
 
-### 6.1 Unified Settings Dialog
-- [ ] Create `ui/main_window.py` with tabbed interface
-- [ ] Tab 1: General Settings (language, model)
-- [ ] Tab 2: API Keys Management
-- [ ] Tab 3: Translation Settings
-- [ ] Tab 4: Image Generation Settings
-- [ ] Tab 5: Sentence Generation Settings
-- [ ] Tab 6: Advanced/Debug
+### 6.1 Unified Settings Dialog (DeckOperationDialog)
+- [x] Create `ui/settings_dialog.py` with tabbed interface
+- [x] Tab 1: Translation Settings (deck selection, field mapping, batch)
+- [x] Tab 2: Sentence Generation Settings
+- [x] Tab 3: Image Generation Settings
+- [x] Tab 4: Settings/API Keys Management
+- [ ] Tab 5: Advanced/Debug
 - [ ] Add deck-specific overrides option
 - [ ] Implement settings search/filter
 
-**UI Layout Sketch:**
+**Key Feature: Deck Selection Dialog**
+Users can now select a deck directly from the add-on window (without browser):
+- Select any deck with cards
+- Auto-populate field dropdowns based on note type
+- Start batch operations for Translation/Sentence/Image generation
+- Real-time progress tracking with stop functionality
+
+**UI Layout:**
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ Stella Anki Tools Settings                         [X] │
+│ Stella Anki Tools - Deck Operations                [X] │
 ├─────────────────────────────────────────────────────────┤
-│ [General] [API Keys] [Translation] [Image] [Sentence]   │
+│ [Translation] [Sentences] [Images] [Settings]           │
 ├─────────────────────────────────────────────────────────┤
+│  Deck: [▼ Select Deck________________]                  │
 │                                                         │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │                                                 │   │
-│  │           (Tab content area)                    │   │
-│  │                                                 │   │
-│  └─────────────────────────────────────────────────┘   │
+│  ┌─Field Mapping────────────────────────────────────┐  │
+│  │ Source Field:      [▼ Front___________]          │  │
+│  │ Context (Optional):[▼ (None)__________]          │  │
+│  │ Destination Field: [▼ Translation_____]          │  │
+│  └──────────────────────────────────────────────────┘  │
 │                                                         │
-│                              [Test API] [Save] [Close]  │
+│  ┌─Options──────────────────────────────────────────┐  │
+│  │ Target Language: [▼ Korean____________]          │  │
+│  │ Model: [▼ gemini-2.5-flash___________]           │  │
+│  │ ☑ Skip cards with existing translations          │  │
+│  └──────────────────────────────────────────────────┘  │
+│                                                         │
+│  [▶ Start Translation]  [⏹ Stop]                       │
+├─────────────────────────────────────────────────────────┤
+│  Progress: [████████░░░░░░░] 45 / 100                  │
+│  Status: Processing... ✅ 42 | ❌ 3 | Rate: 93.3%     │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ### 6.2 Editor Integration
-- [ ] Create `ui/editor_integration.py` (unified from both tools)
-- [ ] Add toolbar buttons for each feature
-- [ ] Implement distinct keyboard shortcuts:
-  - [ ] `Ctrl+Shift+T` - Translate
-  - [ ] `Ctrl+Shift+S` - Generate Sentence
-  - [ ] `Ctrl+Shift+I` - Generate Image
-- [ ] Add WebView message handling for all buttons
+- [x] Create `ui/editor_integration.py` (unified from both tools)
+- [x] Add toolbar buttons for each feature
+- [x] Implement distinct keyboard shortcuts:
+  - [x] `Ctrl+Shift+T` - Translate
+  - [x] `Ctrl+Shift+S` - Generate Sentence
+  - [x] `Ctrl+Shift+I` - Generate Image
+- [x] Add WebView message handling for all buttons
 - [ ] Implement field focus detection for auto-generation
 - [ ] Add status tooltips for feedback
 
 ### 6.3 Progress Dialog
-- [ ] Create reusable `ui/progress_dialog.py`
-- [ ] Show progress bar with percentage
-- [ ] Display current item being processed
+- [x] Create reusable `ui/progress_dialog.py`
+- [x] Show progress bar with percentage
+- [x] Display current item being processed
 - [ ] Show ETA calculation
-- [ ] List errors in expandable section
+- [x] List errors in expandable section
 - [ ] Add pause/resume functionality
-- [ ] Add cancel button with confirmation
-- [ ] Show summary on completion
+- [x] Add cancel button with confirmation
+- [x] Show summary on completion
 
 ### 6.4 Browser Integration
 - [ ] Add context menu items in card browser:
@@ -309,41 +327,44 @@ mw.col.media.add_file(image_path)
 - [ ] Add filter for cards needing processing
 
 ### 6.5 Menu Integration
-- [ ] Add "Tools > Stella Anki Tools" menu
-- [ ] Add "Stella Settings" submenu
-- [ ] Add "Stella Quick Actions" submenu
-- [ ] Add "Stella Help" with documentation link
+- [x] Add "Stella" menu to Anki menubar
+- [x] Add "📚 Deck Operations..." (primary entry point)
+- [x] Add "⚙️ Settings..." submenu
+- [x] Add "🔑 Manage API Keys..." submenu
+- [x] Add "🧪 Test API Connection"
+- [x] Add "📊 API Statistics"
+- [x] Add "ℹ️ About Stella"
 
 ---
 
 ## 7. API & Data Flow
 
 ### 7.1 API Rate Limiting
-- [ ] Implement global rate limiter for Gemini API
-- [ ] Configure per-feature rate limits
+- [x] Implement global rate limiter for Gemini API
+- [x] Configure per-feature rate limits
 - [ ] Add request queuing system
-- [ ] Implement batch delay between requests
-- [ ] Handle 429 errors gracefully with backoff
+- [x] Implement batch delay between requests
+- [x] Handle 429 errors gracefully with backoff
 
 ### 7.2 Data Persistence
-- [ ] Store settings via Anki's config API
-- [ ] Store API keys in encrypted JSON file
-- [ ] Store usage statistics in separate file
+- [x] Store settings via Anki's config API
+- [x] Store API keys in JSON file (api_keys.json)
+- [x] Store usage statistics in separate file (api_stats.json)
 - [ ] Implement data backup functionality
 - [ ] Add data export/import options
 
 ### 7.3 Progress State Management
-- [ ] Create unified `core/progress_manager.py`
+- [x] Create `sentence/progress_state.py`
 - [ ] Persist batch processing state
 - [ ] Support resume after Anki restart
 - [ ] Track per-deck processing history
 - [ ] Clean up stale progress states
 
 ### 7.4 Error Handling
-- [ ] Create error taxonomy (API, Network, Config, etc.)
-- [ ] Implement error recovery strategies per type
-- [ ] Add user-friendly error messages
-- [ ] Log detailed error info for debugging
+- [x] Create error taxonomy (API, Network, Config, etc.) in `core/utils.py`
+- [x] Implement error recovery strategies per type
+- [x] Add user-friendly error messages
+- [x] Log detailed error info for debugging
 - [ ] Collect error analytics (optional, with consent)
 
 ---

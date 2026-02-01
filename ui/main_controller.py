@@ -138,13 +138,19 @@ class StellaAnkiTools:
             self._menu = QMenu("&Stella", self.mw)
             self.mw.form.menubar.addMenu(self._menu)
             
+            # Main deck operations dialog (PRIMARY ENTRY POINT)
+            deck_ops_action = QAction("📚 Deck Operations...", self.mw)
+            deck_ops_action.triggered.connect(self.show_deck_operations)
+            self._menu.addAction(deck_ops_action)
+            self._menu_actions.append(deck_ops_action)
+            
+            self._menu.addSeparator()
+            
             # Settings action
             settings_action = QAction("⚙️ Settings...", self.mw)
             settings_action.triggered.connect(self.show_settings_dialog)
             self._menu.addAction(settings_action)
             self._menu_actions.append(settings_action)
-            
-            self._menu.addSeparator()
             
             # API Key Management
             api_action = QAction("🔑 Manage API Keys...", self.mw)
@@ -160,18 +166,18 @@ class StellaAnkiTools:
             
             self._menu.addSeparator()
             
-            # Feature shortcuts
+            # Feature shortcuts (for browser-selected notes)
             translate_action = QAction("🌐 Translate Selected Notes...", self.mw)
             translate_action.triggered.connect(self.translate_selected_notes)
             self._menu.addAction(translate_action)
             self._menu_actions.append(translate_action)
             
-            sentence_action = QAction("✏️ Generate Sentences...", self.mw)
+            sentence_action = QAction("✏️ Generate Sentences (Selected)...", self.mw)
             sentence_action.triggered.connect(self.generate_sentences_selected)
             self._menu.addAction(sentence_action)
             self._menu_actions.append(sentence_action)
             
-            image_action = QAction("🖼️ Generate Images...", self.mw)
+            image_action = QAction("🖼️ Generate Images (Selected)...", self.mw)
             image_action.triggered.connect(self.generate_images_selected)
             self._menu.addAction(image_action)
             self._menu_actions.append(image_action)
@@ -196,6 +202,17 @@ class StellaAnkiTools:
             logger.error(f"Failed to create menu: {e}")
     
     # ========== Dialogs ==========
+    
+    def show_deck_operations(self) -> None:
+        """Show the main deck operations dialog."""
+        try:
+            from .settings_dialog import DeckOperationDialog
+            dialog = DeckOperationDialog(self.mw)
+            dialog.exec()
+        except Exception as e:
+            logger.error(f"Failed to show deck operations dialog: {e}")
+            from aqt.utils import showWarning
+            showWarning(f"Failed to open deck operations: {e}")
     
     def show_settings_dialog(self) -> None:
         """Show the settings dialog."""

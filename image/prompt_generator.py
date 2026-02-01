@@ -172,6 +172,30 @@ class ImagePromptGenerator:
                 metadata={"fallback": True}
             )
     
+    def generate_prompt_sync(
+        self,
+        word: str,
+        style: Optional[str] = None,
+        context: Optional[str] = None
+    ) -> str:
+        """
+        Generate a prompt synchronously (simplified interface).
+        
+        Args:
+            word: The vocabulary word
+            style: Style preset name
+            context: Optional context
+            
+        Returns:
+            Generated prompt string
+        """
+        result = self.generate_prompt(
+            word=word,
+            context=context,
+            style=style
+        )
+        return result.prompt
+    
     def generate_prompts_batch(
         self,
         words: List[str],
