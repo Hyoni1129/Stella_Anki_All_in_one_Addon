@@ -182,8 +182,7 @@ class APIKeyManager:
                 with open(self._keys_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.state = APIKeyManagerState.from_dict(data)
-        except Exception as e:
-            print(f"[APIKeyManager] Failed to load state: {e}")
+        except Exception:
             self.state = APIKeyManagerState()
     
     def _save_state(self) -> None:
@@ -191,8 +190,8 @@ class APIKeyManager:
         try:
             with open(self._keys_file, "w", encoding="utf-8") as f:
                 json.dump(self.state.to_dict(), f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"[APIKeyManager] Failed to save state: {e}")
+        except Exception:
+            pass  # Silent fail - state save not critical
     
     def _load_stats(self) -> None:
         """Load statistics from persistent storage."""
@@ -200,16 +199,16 @@ class APIKeyManager:
             if os.path.exists(self._stats_file):
                 with open(self._stats_file, "r", encoding="utf-8") as f:
                     self.state.stats = json.load(f)
-        except Exception as e:
-            print(f"[APIKeyManager] Failed to load stats: {e}")
+        except Exception:
+            pass  # Silent fail - stats will reset
     
     def _save_stats(self) -> None:
         """Save statistics to persistent storage."""
         try:
             with open(self._stats_file, "w", encoding="utf-8") as f:
                 json.dump(self.state.stats, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"[APIKeyManager] Failed to save stats: {e}")
+        except Exception:
+            pass  # Silent fail - stats save not critical
     
     def _ensure_stats_for_key(self, key: str) -> None:
         """Ensure statistics entry exists for a key."""
@@ -222,8 +221,8 @@ class APIKeyManager:
         for listener in self._listeners:
             try:
                 listener(event, data or {})
-            except Exception as e:
-                print(f"[APIKeyManager] Listener error: {e}")
+            except Exception:
+                pass  # Silent fail for event listeners
     
     # ========== Listener Management ==========
     

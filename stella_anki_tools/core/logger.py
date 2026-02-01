@@ -127,12 +127,10 @@ class StellaLogger:
     def warning(self, message: str) -> None:
         """Log warning message."""
         self.logger.warning(message)
-        print(f"[Stella WARNING] {message}")
     
     def error(self, message: str) -> None:
         """Log error message."""
         self.logger.error(message)
-        print(f"[Stella ERROR] {message}")
     
     def exception(self, message: str) -> None:
         """Log exception with traceback."""
@@ -207,3 +205,20 @@ class StellaLogger:
         """
         word_info = f"'{word}'" if word else f"ID:{note_id}"
         self.debug(f"Note [{operation}] {word_info} - {status}")
+
+
+def get_logger(module_name: str = "stella") -> StellaLogger:
+    """
+    Get a logger instance using the default add-on directory.
+    
+    Convenience function for module-level logging.
+    
+    Args:
+        module_name: Module name for the logger
+        
+    Returns:
+        StellaLogger instance
+    """
+    import os
+    addon_dir = os.path.dirname(os.path.dirname(__file__))
+    return StellaLogger.get_logger(addon_dir, module_name)

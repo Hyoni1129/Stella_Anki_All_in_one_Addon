@@ -267,7 +267,7 @@ class ConfigManager:
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(config_dict, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            print(f"[Stella] Failed to save config: {e}")
+            pass  # Silent fail - config save not critical
     
     def reload(self) -> None:
         """Reload configuration from storage."""
