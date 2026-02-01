@@ -559,12 +559,12 @@ class EditorIntegration:
         except Exception as e:
             logger.error(f"Failed to open settings: {e}")
     
-    def _auto_translate(self, note: 'Note', field_idx: int) -> None:
+    def _auto_translate(self, _note: 'Note', field_idx: int) -> None:
         """Auto-translate after field change."""
         # Implementation would queue translation
         logger.debug(f"Auto-translate triggered for field {field_idx}")
     
-    def _auto_sentence(self, note: 'Note', field_idx: int) -> None:
+    def _auto_sentence(self, _note: 'Note', field_idx: int) -> None:
         """Auto-generate sentence after field change."""
         logger.debug(f"Auto-sentence triggered for field {field_idx}")
 

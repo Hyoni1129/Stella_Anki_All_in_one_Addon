@@ -164,23 +164,11 @@ class StellaAnkiTools:
             self._menu.addAction(test_action)
             self._menu_actions.append(test_action)
             
-            self._menu.addSeparator()
-            
-            # Feature shortcuts (for browser-selected notes)
-            translate_action = QAction("🌐 Translate Selected Notes...", self.mw)
-            translate_action.triggered.connect(self.translate_selected_notes)
-            self._menu.addAction(translate_action)
-            self._menu_actions.append(translate_action)
-            
-            sentence_action = QAction("✏️ Generate Sentences (Selected)...", self.mw)
-            sentence_action.triggered.connect(self.generate_sentences_selected)
-            self._menu.addAction(sentence_action)
-            self._menu_actions.append(sentence_action)
-            
-            image_action = QAction("🖼️ Generate Images (Selected)...", self.mw)
-            image_action.triggered.connect(self.generate_images_selected)
-            self._menu.addAction(image_action)
-            self._menu_actions.append(image_action)
+            # Run Diagnostics
+            diag_action = QAction("🕵️ Run Diagnostics", self.mw)
+            diag_action.triggered.connect(self.run_diagnostics)
+            self._menu.addAction(diag_action)
+            self._menu_actions.append(diag_action)
             
             self._menu.addSeparator()
             
@@ -334,114 +322,45 @@ Version: 1.0.0
         except Exception as e:
             showWarning(f"❌ API Test Error:\n{e}")
     
-    # ========== Feature Actions ==========
-    
-    def translate_selected_notes(self) -> None:
-        """Translate currently selected notes in browser."""
+    def run_diagnostics(self) -> None:
+        """Run the self-diagnosis suite."""
         try:
-            # Get selected notes from browser
-            browser = self._get_active_browser()
-            if not browser:
-                from aqt.utils import showWarning
-                showWarning("Please open the card browser and select notes to translate.")
-                return
+            from ..tests.diagnostics import StellaDiagnostics
+            from aqt.utils import showInfo, showText
             
-            note_ids = browser.selectedNotes()
-            if not note_ids:
-                from aqt.utils import showWarning
-                showWarning("Please select notes to translate.")
-                return
+            # Run diagnostics
+            diag = StellaDiagnostics()
+            results = diag.run_all()
             
-            # Start batch translation
-            from .progress_dialog import show_batch_progress
-            from ..translation.batch_translator import BatchTranslator
+            status = results.get("final_status", "UNKNOWN")
             
-            batch = BatchTranslator(
-                note_ids=list(note_ids),
-                config=self.config.translation
-            )
+            # Format report for display
+            import json
+            report_str = json.dumps(results, indent=2, ensure_ascii=False)
             
-            show_batch_progress(
-                self.mw,
-                batch,
-                title="Translating Notes",
-                on_complete=lambda results: self._on_batch_complete("Translation", results)
-            )
+            if status == "SUCCESS":
+                showInfo(
+                    "✅ Diagnostics Passed!\n\n"
+                    "All systems appear to be functioning correctly.\n"
+                    "See detailed report for more info.",
+                    title="Stella Diagnostics"
+                )
+            else:
+                reason = results.get("error", "Unknown error")
+                showInfo(
+                    f"⚠️ Diagnostics Failed: {status}\n\n"
+                    f"Reason: {reason}\n\n"
+                    "Please check the log file or share the report.",
+                    title="Stella Diagnostics"
+                )
+            
+            # Show detailed report
+            showText(report_str, title="Diagnostic Report")
             
         except Exception as e:
-            logger.error(f"Failed to translate selected notes: {e}")
+            logger.error(f"Failed to run diagnostics: {e}")
             from aqt.utils import showWarning
-            showWarning(f"Translation failed: {e}")
-    
-    def generate_sentences_selected(self) -> None:
-        """Generate sentences for selected notes."""
-        try:
-            browser = self._get_active_browser()
-            if not browser:
-                from aqt.utils import showWarning
-                showWarning("Please open the card browser and select notes.")
-                return
-            
-            note_ids = browser.selectedNotes()
-            if not note_ids:
-                from aqt.utils import showWarning
-                showWarning("Please select notes for sentence generation.")
-                return
-            
-            from aqt.utils import showInfo
-            showInfo(f"Sentence generation for {len(note_ids)} notes.\n(Feature coming soon)")
-            
-        except Exception as e:
-            logger.error(f"Failed to generate sentences: {e}")
-    
-    def generate_images_selected(self) -> None:
-        """Generate images for selected notes."""
-        try:
-            browser = self._get_active_browser()
-            if not browser:
-                from aqt.utils import showWarning
-                showWarning("Please open the card browser and select notes.")
-                return
-            
-            note_ids = browser.selectedNotes()
-            if not note_ids:
-                from aqt.utils import showWarning
-                showWarning("Please select notes for image generation.")
-                return
-            
-            from aqt.utils import showInfo
-            showInfo(f"Image generation for {len(note_ids)} notes.\n(Feature coming soon)")
-            
-        except Exception as e:
-            logger.error(f"Failed to generate images: {e}")
-    
-    def _get_active_browser(self):
-        """Get the active browser window if any."""
-        try:
-            from aqt.browser import Browser
-            
-            for window in self.mw.app.topLevelWidgets():
-                if isinstance(window, Browser) and window.isVisible():
-                    return window
-            return None
-        except Exception:
-            return None
-    
-    def _on_batch_complete(self, feature: str, results: Dict[str, Any]) -> None:
-        """Handle batch operation completion."""
-        from aqt.utils import showInfo
-        
-        success = results.get("successful", 0)
-        total = results.get("total", 0)
-        failed = results.get("failed", 0)
-        
-        msg = f"{feature} Complete\n\n"
-        msg += f"✅ Successful: {success}/{total}\n"
-        
-        if failed > 0:
-            msg += f"❌ Failed: {failed}\n"
-        
-        showInfo(msg, title=f"{feature} Results")
+            showWarning(f"Failed to run diagnostics: {e}")
     
     # ========== Cleanup ==========
     
