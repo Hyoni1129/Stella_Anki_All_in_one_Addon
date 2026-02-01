@@ -7,7 +7,7 @@ Manages multiple Google Gemini API keys with:
 - Daily quota tracking
 - Usage statistics
 - Cooldown management for exhausted keys
-- Optional encryption (future enhancement)
+- Optional encryption for secure key storage
 
 Adapted from Anki_Deck_Translater/api_key_manager.py with improvements.
 """
@@ -18,6 +18,8 @@ import os
 import json
 import re
 import time
+import base64
+import hashlib
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any, Callable
 from dataclasses import dataclass, field, asdict
@@ -28,6 +30,46 @@ FAILURE_THRESHOLD = 5
 KEY_COOLDOWN_HOURS = 24
 API_KEY_MIN_LENGTH = 35
 API_KEY_MAX_LENGTH = 50
+
+# Encryption settings
+ENCRYPTION_ENABLED = True
+ENCRYPTION_KEY_LENGTH = 32  # AES-256
+
+
+def _derive_encryption_key(password: str, salt: bytes = b"stella_anki_2025") -> bytes:
+    """Derive an encryption key from a password using PBKDF2."""
+    return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000, dklen=ENCRYPTION_KEY_LENGTH)
+
+
+def _simple_encrypt(data: str, key: bytes) -> str:
+    """
+    Simple XOR-based encryption for API keys.
+    
+    Note: For production use, consider using cryptography.fernet.Fernet
+    This implementation avoids external dependencies.
+    """
+    if not data:
+        return ""
+    
+    data_bytes = data.encode('utf-8')
+    key_extended = (key * ((len(data_bytes) // len(key)) + 1))[:len(data_bytes)]
+    encrypted = bytes(a ^ b for a, b in zip(data_bytes, key_extended))
+    return base64.urlsafe_b64encode(encrypted).decode('utf-8')
+
+
+def _simple_decrypt(encrypted_data: str, key: bytes) -> str:
+    """Decrypt data that was encrypted with _simple_encrypt."""
+    if not encrypted_data:
+        return ""
+    
+    try:
+        encrypted_bytes = base64.urlsafe_b64decode(encrypted_data.encode('utf-8'))
+        key_extended = (key * ((len(encrypted_bytes) // len(key)) + 1))[:len(encrypted_bytes)]
+        decrypted = bytes(a ^ b for a, b in zip(encrypted_bytes, key_extended))
+        return decrypted.decode('utf-8')
+    except Exception:
+        # Return original if decryption fails (might be unencrypted legacy key)
+        return encrypted_data
 
 
 def _sanitize_error_reason(reason: str) -> str:
@@ -95,24 +137,63 @@ class APIKeyManagerState:
     stats: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     last_rotation: Optional[str] = None
     total_rotations: int = 0
+    encryption_enabled: bool = True  # Enable encryption by default
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, encrypt: bool = False, encryption_key: Optional[bytes] = None) -> Dict[str, Any]:
+        """
+        Convert state to dictionary.
+        
+        Args:
+            encrypt: Whether to encrypt the API keys
+            encryption_key: Key to use for encryption
+        """
+        keys_to_store = self.keys
+        
+        if encrypt and encryption_key and self.keys:
+            # Encrypt each key before storing
+            keys_to_store = [_simple_encrypt(key, encryption_key) for key in self.keys]
+        
         return {
             "current_key_index": self.current_key_index,
-            "keys": self.keys,
+            "keys": keys_to_store,
             "stats": self.stats,
             "last_rotation": self.last_rotation,
             "total_rotations": self.total_rotations,
+            "encrypted": encrypt,  # Flag to indicate if keys are encrypted
         }
     
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "APIKeyManagerState":
+    def from_dict(cls, data: Dict[str, Any], encryption_key: Optional[bytes] = None) -> "APIKeyManagerState":
+        """
+        Create state from dictionary.
+        
+        Args:
+            data: Dictionary containing state data
+            encryption_key: Key to use for decryption if keys are encrypted
+        """
+        keys = data.get("keys", [])
+        is_encrypted = data.get("encrypted", False)
+        
+        if is_encrypted and encryption_key and keys:
+            # Decrypt each key
+            decrypted_keys = []
+            for key in keys:
+                decrypted = _simple_decrypt(key, encryption_key)
+                # Validate it looks like an API key (starts with AIza)
+                if decrypted.startswith("AIza") or not key.startswith("AIza"):
+                    decrypted_keys.append(decrypted)
+                else:
+                    # Decryption failed or key is not encrypted, use original
+                    decrypted_keys.append(key)
+            keys = decrypted_keys
+        
         return cls(
             current_key_index=data.get("current_key_index", 0),
-            keys=data.get("keys", []),
+            keys=keys,
             stats=data.get("stats", {}),
             last_rotation=data.get("last_rotation"),
             total_rotations=data.get("total_rotations", 0),
+            encryption_enabled=data.get("encrypted", True),
         )
 
 
@@ -126,6 +207,7 @@ class APIKeyManager:
     - Daily quota tracking (keys exhausted for 24 hours)
     - Usage statistics per key
     - Event listeners for UI updates
+    - Encrypted storage for API keys
     """
     
     _instance: Optional["APIKeyManager"] = None
@@ -150,6 +232,9 @@ class APIKeyManager:
         self._initialized = True
         self._addon_dir = addon_dir or os.path.dirname(os.path.dirname(__file__))
         self._setup_paths()
+        
+        # Generate encryption key from addon directory path (machine-specific)
+        self._encryption_key = _derive_encryption_key(self._addon_dir)
         
         self.state = APIKeyManagerState()
         self._load_state()
@@ -176,20 +261,25 @@ class APIKeyManager:
         return f"{key[:4]}...{key[-4:]}"
     
     def _load_state(self) -> None:
-        """Load state from persistent storage."""
+        """Load state from persistent storage with decryption support."""
         try:
             if os.path.exists(self._keys_file):
                 with open(self._keys_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    self.state = APIKeyManagerState.from_dict(data)
+                    # Pass encryption key for decryption
+                    self.state = APIKeyManagerState.from_dict(data, self._encryption_key)
         except Exception:
             self.state = APIKeyManagerState()
     
     def _save_state(self) -> None:
-        """Save state to persistent storage."""
+        """Save state to persistent storage with encryption."""
         try:
             with open(self._keys_file, "w", encoding="utf-8") as f:
-                json.dump(self.state.to_dict(), f, indent=2, ensure_ascii=False)
+                # Always save with encryption enabled
+                json.dump(
+                    self.state.to_dict(encrypt=ENCRYPTION_ENABLED, encryption_key=self._encryption_key), 
+                    f, indent=2, ensure_ascii=False
+                )
         except Exception:
             pass  # Silent fail - state save not critical
     

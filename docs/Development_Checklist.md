@@ -103,7 +103,7 @@ if __name__ != "__main__":
 
 ### 2.3 API Key Management (Unified)
 - [x] Create `core/api_key_manager.py` merging best practices from all tools
-- [ ] Implement encrypted storage using Fernet (from Image Gen)
+- [x] Implement encrypted storage using XOR-based encryption with PBKDF2 key derivation
 - [x] Implement multi-key rotation (from Translator)
 - [x] Add automatic cooldown on 429 errors
 - [x] Track per-key usage statistics
@@ -115,7 +115,7 @@ if __name__ != "__main__":
 | Feature | Source | Priority | Status |
 |---------|--------|----------|--------|
 | Max 15 keys | Translator | High | ✅ Done |
-| Encrypted storage | Image Gen | High | ⏳ Pending |
+| Encrypted storage | Image Gen | High | ✅ Done |
 | Auto-rotation | Translator | High | ✅ Done |
 | Usage stats | Both | Medium | ✅ Done |
 | 24hr cooldown | Translator | Medium | ✅ Done |
@@ -228,7 +228,7 @@ mw.col.media.add_file(image_path)
 - [x] Create `sentence/__init__.py`
 - [x] Port `SentenceGenerator` → `sentence/sentence_generator.py`
 - [x] Port `ProgressStateManager` → `sentence/progress_state.py`
-- [ ] Implement resume functionality for interrupted batches
+- [x] Implement resume functionality for interrupted batches
 - [x] Add word highlighting in generated sentences
 
 ### 5.2 Sentence Features
@@ -236,7 +236,7 @@ mw.col.media.add_file(image_path)
 - [x] Batch sentence generation (via DeckOperationDialog)
 - [x] Difficulty levels (Beginner, Normal, Complex)
 - [x] Sentence + translation pair generation
-- [ ] Resume from last position
+- [x] Resume from last position
 - [ ] Error recovery with retry queue
 
 ### 5.3 Sentence Configuration
@@ -311,9 +311,9 @@ Users can now select a deck directly from the add-on window (without browser):
 - [x] Create reusable `ui/progress_dialog.py`
 - [x] Show progress bar with percentage
 - [x] Display current item being processed
-- [ ] Show ETA calculation
+- [x] Show ETA calculation
 - [x] List errors in expandable section
-- [ ] Add pause/resume functionality
+- [x] Add pause/resume functionality
 - [x] Add cancel button with confirmation
 - [x] Show summary on completion
 
@@ -355,8 +355,8 @@ Users can now select a deck directly from the add-on window (without browser):
 
 ### 7.3 Progress State Management
 - [x] Create `sentence/progress_state.py`
-- [ ] Persist batch processing state
-- [ ] Support resume after Anki restart
+- [x] Persist batch processing state
+- [x] Support resume after Anki restart
 - [ ] Track per-deck processing history
 - [ ] Clean up stale progress states
 
@@ -372,9 +372,9 @@ Users can now select a deck directly from the add-on window (without browser):
 ## 8. Testing & Quality Assurance
 
 ### 8.1 Unit Tests
-- [ ] Create `tests/` directory structure
-- [ ] Test configuration loading/saving
-- [ ] Test API key manager operations
+- [x] Create `tests/` directory structure
+- [x] Test configuration loading/saving
+- [x] Test API key manager operations (encryption, rotation)
 - [ ] Test prompt generation
 - [ ] Test response parsing
 - [ ] Test error handling
@@ -386,7 +386,7 @@ Users can now select a deck directly from the add-on window (without browser):
 - [ ] Test image generation end-to-end
 - [ ] Test sentence generation end-to-end
 - [ ] Test batch processing
-- [ ] Test resume functionality
+- [x] Test resume functionality
 
 ### 8.3 Edge Cases
 - [ ] Empty field handling

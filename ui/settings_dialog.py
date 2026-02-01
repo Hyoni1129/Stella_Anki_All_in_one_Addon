@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, List, Dict, Any, Set
 import threading
+import time
 
 if TYPE_CHECKING:
     from aqt.main import AnkiQt
@@ -29,8 +30,25 @@ from aqt.utils import showInfo, showWarning, askUser
 from ..core.logger import get_logger
 from ..core.api_key_manager import get_api_key_manager
 from ..config.settings import ConfigManager
+from ..sentence.progress_state import ProgressStateManager
 
 logger = get_logger(__name__)
+
+
+def format_eta(seconds: float) -> str:
+    """Format seconds to human readable ETA string."""
+    if seconds <= 0:
+        return "calculating..."
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    elif seconds < 3600:
+        mins = int(seconds // 60)
+        secs = int(seconds % 60)
+        return f"{mins}m {secs}s"
+    else:
+        hours = int(seconds // 3600)
+        mins = int((seconds % 3600) // 60)
+        return f"{hours}h {mins}m"
 
 
 class DeckOperationDialog(QDialog):
@@ -41,7 +59,9 @@ class DeckOperationDialog(QDialog):
     - Select a deck directly (no browser required)
     - Configure field mappings
     - Run batch translation, sentence, or image generation
-    - Monitor progress in real-time
+    - Monitor progress in real-time with ETA
+    - Pause/resume operations
+    - Resume interrupted batches
     """
     
     def __init__(self, parent: 'AnkiQt'):
@@ -50,12 +70,19 @@ class DeckOperationDialog(QDialog):
         self._config_manager = ConfigManager()
         self._key_manager = get_api_key_manager()
         self._thread_pool = QThreadPool.globalInstance()
+        self._progress_manager = ProgressStateManager()
         
         # Current state
         self._current_deck = ""
         self._current_fields: List[str] = []
         self._active_worker = None
         self._cancel_event = threading.Event()
+        self._pause_event = threading.Event()  # New: for pause functionality
+        
+        # ETA tracking
+        self._start_time: float = 0
+        self._items_processed: int = 0
+        self._total_items: int = 0
         
         # UI elements
         self._deck_dropdown: Optional[QComboBox] = None
@@ -72,6 +99,7 @@ class DeckOperationDialog(QDialog):
         self._progress_bar: Optional[QProgressBar] = None
         self._progress_label: Optional[QLabel] = None
         self._status_label: Optional[QLabel] = None
+        self._eta_label: Optional[QLabel] = None
         self._error_log: Optional[QTextEdit] = None
         
         # Stats
@@ -80,13 +108,53 @@ class DeckOperationDialog(QDialog):
         
         self._setup_ui()
         self._load_decks()
+        self._check_pending_operations()
         logger.info("DeckOperationDialog initialized")
+    
+    def _check_pending_operations(self) -> None:
+        """Check for interrupted operations that can be resumed."""
+        if self._progress_manager.has_pending_run():
+            run_info = self._progress_manager.describe_run()
+            pending = self._progress_manager.get_pending_ids()
+            
+            if askUser(
+                f"Found interrupted operation:\n\n"
+                f"Type: {run_info.get('run_type', 'unknown')}\n"
+                f"Started: {run_info.get('started_at', 'unknown')}\n"
+                f"Pending items: {len(pending)}\n\n"
+                f"Would you like to resume?"
+            ):
+                self._resume_pending_operation()
+            else:
+                if askUser("Clear this interrupted operation?"):
+                    self._progress_manager.clear()
+    
+    def _resume_pending_operation(self) -> None:
+        """Resume an interrupted operation."""
+        run_info = self._progress_manager.describe_run()
+        pending_ids = self._progress_manager.get_pending_ids()
+        
+        if not pending_ids:
+            showInfo("No pending items to process.")
+            return
+        
+        # Get the stored run info
+        run_type = run_info.get("run_type", "")
+        
+        if run_type == "sentence":
+            self._resume_sentence_batch(pending_ids, run_info)
+        elif run_type == "image":
+            self._resume_image_batch(pending_ids, run_info)
+        elif run_type == "translation":
+            showInfo("Translation resume not yet implemented.")
+        else:
+            showWarning(f"Unknown operation type: {run_type}")
     
     def _setup_ui(self) -> None:
         """Set up the dialog UI."""
         self.setWindowTitle("Stella Anki Tools - Deck Operations")
         self.setMinimumWidth(550)
-        self.setMinimumHeight(650)
+        self.setMinimumHeight(700)
         
         layout = QVBoxLayout(self)
         
@@ -115,8 +183,14 @@ class DeckOperationDialog(QDialog):
         progress_group = QGroupBox("Progress")
         progress_layout = QVBoxLayout(progress_group)
         
+        # Status and ETA row
+        status_row = QHBoxLayout()
         self._status_label = QLabel("Ready")
-        progress_layout.addWidget(self._status_label)
+        status_row.addWidget(self._status_label, 1)
+        self._eta_label = QLabel("ETA: --")
+        self._eta_label.setStyleSheet("color: #666;")
+        status_row.addWidget(self._eta_label)
+        progress_layout.addLayout(status_row)
         
         progress_row = QHBoxLayout()
         self._progress_bar = QProgressBar()
@@ -125,6 +199,23 @@ class DeckOperationDialog(QDialog):
         self._progress_label = QLabel("0 / 0")
         progress_row.addWidget(self._progress_label)
         progress_layout.addLayout(progress_row)
+        
+        # Control buttons row
+        control_row = QHBoxLayout()
+        self._pause_btn = QPushButton("⏸ Pause")
+        self._pause_btn.setStyleSheet("background-color: #ffc107; color: black;")
+        self._pause_btn.setEnabled(False)
+        self._pause_btn.clicked.connect(self._toggle_pause)
+        control_row.addWidget(self._pause_btn)
+        
+        self._global_stop_btn = QPushButton("⏹ Stop All")
+        self._global_stop_btn.setStyleSheet("background-color: #dc3545; color: white;")
+        self._global_stop_btn.setEnabled(False)
+        self._global_stop_btn.clicked.connect(self._stop_operation)
+        control_row.addWidget(self._global_stop_btn)
+        
+        control_row.addStretch()
+        progress_layout.addLayout(control_row)
         
         # Error log (collapsible)
         self._error_log = QTextEdit()
@@ -853,7 +944,69 @@ class DeckOperationDialog(QDialog):
         """Stop the current operation."""
         if self._cancel_event:
             self._cancel_event.set()
+            self._pause_event.set()  # Also release pause if paused
             self._status_label.setText("Stopping...")
+            self._pause_btn.setEnabled(False)
+            self._global_stop_btn.setEnabled(False)
+    
+    def _toggle_pause(self) -> None:
+        """Toggle pause/resume state."""
+        if self._pause_event.is_set():
+            # Currently paused, resume
+            self._pause_event.clear()
+            self._pause_btn.setText("⏸ Pause")
+            self._pause_btn.setStyleSheet("background-color: #ffc107; color: black;")
+            self._status_label.setText("Resuming...")
+        else:
+            # Running, pause
+            self._pause_event.set()
+            self._pause_btn.setText("▶ Resume")
+            self._pause_btn.setStyleSheet("background-color: #28a745; color: white;")
+            self._status_label.setText("Paused")
+    
+    def _update_eta(self, processed: int, total: int) -> None:
+        """Update ETA based on current progress."""
+        self._items_processed = processed
+        if processed <= 0 or self._start_time <= 0:
+            self._eta_label.setText("ETA: calculating...")
+            return
+        
+        elapsed = time.time() - self._start_time
+        avg_time_per_item = elapsed / processed
+        remaining = total - processed
+        eta_seconds = avg_time_per_item * remaining
+        
+        self._eta_label.setText(f"ETA: {format_eta(eta_seconds)}")
+    
+    def _start_batch_ui(self, total: int, operation_type: str) -> None:
+        """Initialize UI for batch operation."""
+        self._cancel_event.clear()
+        self._pause_event.clear()
+        self._success_count = 0
+        self._failure_count = 0
+        self._start_time = time.time()
+        self._total_items = total
+        self._items_processed = 0
+        self._error_log.clear()
+        self._error_log.hide()
+        
+        self._progress_bar.setMaximum(total)
+        self._progress_bar.setValue(0)
+        self._progress_label.setText(f"0 / {total}")
+        self._status_label.setText(f"Starting {operation_type}...")
+        self._eta_label.setText("ETA: calculating...")
+        
+        # Enable control buttons
+        self._pause_btn.setEnabled(True)
+        self._pause_btn.setText("⏸ Pause")
+        self._pause_btn.setStyleSheet("background-color: #ffc107; color: black;")
+        self._global_stop_btn.setEnabled(True)
+    
+    def _end_batch_ui(self) -> None:
+        """Reset UI after batch operation ends."""
+        self._pause_btn.setEnabled(False)
+        self._global_stop_btn.setEnabled(False)
+        self._eta_label.setText("ETA: --")
     
     # ========== Sentence Generation ==========
     
@@ -897,39 +1050,68 @@ class DeckOperationDialog(QDialog):
         notes_data: List[Dict],
         word_field: str,
         sentence_field: str,
-        trans_field: str
+        trans_field: str,
+        resume_ids: Optional[Set[int]] = None
     ) -> None:
-        """Run sentence generation batch (simple version)."""
+        """Run sentence generation batch with pause/resume support."""
         from ..sentence.sentence_generator import SentenceGenerator
+        from aqt.qt import QApplication
         
         generator = SentenceGenerator()
         total = len(notes_data)
         success = 0
         failure = 0
         
-        self._progress_bar.setMaximum(total)
-        self._sentence_btn.setEnabled(False)
-        self._stop_sentence_btn.setEnabled(True)
-        self._cancel_event.clear()
-        
         language = self._sentence_lang_dropdown.currentText()
         difficulty = self._difficulty_dropdown.currentText()
         highlight = self._highlight_cb.isChecked()
         
-        import time
+        # Start batch UI
+        self._start_batch_ui(total, "sentence generation")
+        self._sentence_btn.setEnabled(False)
+        self._stop_sentence_btn.setEnabled(True)
+        
+        # Initialize progress state
+        note_ids = [n["note_id"] for n in notes_data]
+        self._progress_manager.start_run(
+            run_type="sentence",
+            total_ids=note_ids,
+            extra_info={
+                "word_field": word_field,
+                "sentence_field": sentence_field,
+                "trans_field": trans_field,
+                "language": language,
+                "difficulty": difficulty,
+                "highlight": highlight,
+            }
+        )
+        
         for i, note_data in enumerate(notes_data):
+            # Check cancel
             if self._cancel_event.is_set():
                 break
+            
+            # Check pause (wait loop)
+            while self._pause_event.is_set() and not self._cancel_event.is_set():
+                QApplication.processEvents()
+                time.sleep(0.1)
+            
+            if self._cancel_event.is_set():
+                break
+            
+            # Skip if resuming and already done
+            note_id = note_data["note_id"]
+            if resume_ids and note_id not in resume_ids:
+                continue
             
             note = note_data["note"]
             word = note_data["word"]
             
+            # Update progress UI
             self._progress_bar.setValue(i + 1)
             self._progress_label.setText(f"{i + 1} / {total}")
             self._status_label.setText(f"Processing: {word[:20]}...")
-            
-            # Process events to keep UI responsive
-            from aqt.qt import QApplication
+            self._update_eta(i + 1, total)
             QApplication.processEvents()
             
             try:
@@ -955,17 +1137,70 @@ class DeckOperationDialog(QDialog):
                 mw.col.update_note(note)
                 
                 success += 1
+                self._progress_manager.mark_success(note_id)
+                self._key_manager.record_success("sentence")
                 
             except Exception as e:
                 logger.error(f"Sentence generation failed for '{word}': {e}")
                 failure += 1
+                self._progress_manager.mark_failure(note_id, str(e))
+                self._key_manager.record_failure(str(e))
             
             # Rate limiting
             time.sleep(2.0)
         
+        # Cleanup
         self._sentence_btn.setEnabled(True)
         self._stop_sentence_btn.setEnabled(False)
+        self._end_batch_ui()
+        
+        # Clear progress state if completed
+        if not self._cancel_event.is_set():
+            self._progress_manager.clear()
+        
         self._on_finished(success, failure)
+    
+    def _resume_sentence_batch(self, pending_ids: List[int], run_info: Dict) -> None:
+        """Resume an interrupted sentence batch."""
+        extra = run_info.get("extra_info", {})
+        
+        # Rebuild notes_data from pending IDs
+        notes_data = []
+        for note_id in pending_ids:
+            try:
+                note = mw.col.get_note(note_id)
+                word_field = extra.get("word_field", "")
+                if word_field and word_field in note:
+                    word = self._strip_html(note[word_field])
+                    notes_data.append({
+                        "note": note,
+                        "note_id": note_id,
+                        "word": word,
+                        "context": "",
+                    })
+            except Exception as e:
+                logger.error(f"Could not load note {note_id}: {e}")
+        
+        if not notes_data:
+            showInfo("No pending notes could be loaded.")
+            return
+        
+        # Restore settings
+        if extra.get("language"):
+            self._sentence_lang_dropdown.setCurrentText(extra["language"])
+        if extra.get("difficulty"):
+            self._difficulty_dropdown.setCurrentText(extra["difficulty"])
+        if extra.get("highlight") is not None:
+            self._highlight_cb.setChecked(extra["highlight"])
+        
+        # Run batch with resume
+        self._run_sentence_batch(
+            notes_data=notes_data,
+            word_field=extra.get("word_field", ""),
+            sentence_field=extra.get("sentence_field", ""),
+            trans_field=extra.get("trans_field", ""),
+            resume_ids=set(pending_ids)
+        )
     
     # ========== Image Generation ==========
     
@@ -1002,12 +1237,14 @@ class DeckOperationDialog(QDialog):
         self,
         notes_data: List[Dict],
         word_field: str,
-        image_field: str
+        image_field: str,
+        resume_ids: Optional[Set[int]] = None
     ) -> None:
-        """Run image generation batch."""
+        """Run image generation batch with pause/resume support."""
         from ..image.image_generator import ImageGenerator
         from ..image.prompt_generator import ImagePromptGenerator
         from ..image.anki_media import AnkiMediaManager
+        from aqt.qt import QApplication
         
         image_gen = ImageGenerator(self._key_manager)
         prompt_gen = ImagePromptGenerator()
@@ -1019,24 +1256,49 @@ class DeckOperationDialog(QDialog):
         
         style = self._style_dropdown.currentText()
         
-        self._progress_bar.setMaximum(total)
+        # Start batch UI
+        self._start_batch_ui(total, "image generation")
         self._image_btn.setEnabled(False)
         self._stop_image_btn.setEnabled(True)
-        self._cancel_event.clear()
         
-        import time
+        # Initialize progress state
+        note_ids = [n["note_id"] for n in notes_data]
+        self._progress_manager.start_run(
+            run_type="image",
+            total_ids=note_ids,
+            extra_info={
+                "word_field": word_field,
+                "image_field": image_field,
+                "style": style,
+            }
+        )
+        
         for i, note_data in enumerate(notes_data):
+            # Check cancel
             if self._cancel_event.is_set():
                 break
+            
+            # Check pause (wait loop)
+            while self._pause_event.is_set() and not self._cancel_event.is_set():
+                QApplication.processEvents()
+                time.sleep(0.1)
+            
+            if self._cancel_event.is_set():
+                break
+            
+            # Skip if resuming and already done
+            note_id = note_data["note_id"]
+            if resume_ids and note_id not in resume_ids:
+                continue
             
             note = note_data["note"]
             word = note_data["word"]
             
+            # Update progress UI
             self._progress_bar.setValue(i + 1)
             self._progress_label.setText(f"{i + 1} / {total}")
             self._status_label.setText(f"Generating image: {word[:20]}...")
-            
-            from aqt.qt import QApplication
+            self._update_eta(i + 1, total)
             QApplication.processEvents()
             
             try:
@@ -1061,23 +1323,74 @@ class DeckOperationDialog(QDialog):
                         note[image_field] = f'<img src="{media_result.filename}">'
                         mw.col.update_note(note)
                         success += 1
+                        self._progress_manager.mark_success(note_id)
+                        self._key_manager.record_success("image")
                     else:
                         failure += 1
+                        self._progress_manager.mark_failure(note_id, media_result.error or "Save failed")
                         logger.warning(f"Failed to save image: {media_result.error}")
                 else:
                     failure += 1
+                    self._progress_manager.mark_failure(note_id, result.error or "Generation failed")
+                    self._key_manager.record_failure(result.error or "unknown")
                     logger.warning(f"Image generation failed: {result.error}")
                     
             except Exception as e:
                 logger.error(f"Image generation failed for '{word}': {e}")
                 failure += 1
+                self._progress_manager.mark_failure(note_id, str(e))
+                self._key_manager.record_failure(str(e))
             
             # Rate limiting (images need more time)
             time.sleep(3.0)
         
+        # Cleanup
         self._image_btn.setEnabled(True)
         self._stop_image_btn.setEnabled(False)
+        self._end_batch_ui()
+        
+        # Clear progress state if completed
+        if not self._cancel_event.is_set():
+            self._progress_manager.clear()
+        
         self._on_finished(success, failure)
+    
+    def _resume_image_batch(self, pending_ids: List[int], run_info: Dict) -> None:
+        """Resume an interrupted image batch."""
+        extra = run_info.get("extra_info", {})
+        
+        # Rebuild notes_data from pending IDs
+        notes_data = []
+        for note_id in pending_ids:
+            try:
+                note = mw.col.get_note(note_id)
+                word_field = extra.get("word_field", "")
+                if word_field and word_field in note:
+                    word = self._strip_html(note[word_field])
+                    notes_data.append({
+                        "note": note,
+                        "note_id": note_id,
+                        "word": word,
+                        "context": "",
+                    })
+            except Exception as e:
+                logger.error(f"Could not load note {note_id}: {e}")
+        
+        if not notes_data:
+            showInfo("No pending notes could be loaded.")
+            return
+        
+        # Restore settings
+        if extra.get("style"):
+            self._style_dropdown.setCurrentText(extra["style"])
+        
+        # Run batch with resume
+        self._run_image_batch(
+            notes_data=notes_data,
+            word_field=extra.get("word_field", ""),
+            image_field=extra.get("image_field", ""),
+            resume_ids=set(pending_ids)
+        )
     
     # ========== API Key Management ==========
     
