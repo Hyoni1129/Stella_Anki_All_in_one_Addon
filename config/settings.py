@@ -48,12 +48,18 @@ class TranslationConfig:
     batch_delay_seconds: int = 8
     skip_existing: bool = True
     overwrite_existing: bool = False
+    model_name: str = "gemini-2.5-flash"
+    
+    @property
+    def target_language(self) -> str:
+        """Alias for language field for UI compatibility."""
+        return self.language
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TranslationConfig":
         return cls(
             enabled=data.get("enabled", True),
-            language=data.get("language", "Korean"),
+            language=data.get("language", data.get("target_language", "Korean")),
             source_field=data.get("source_field", "Word"),
             context_field=data.get("context_field", "Definition"),
             destination_field=data.get("destination_field", "Translation"),
@@ -61,6 +67,7 @@ class TranslationConfig:
             batch_delay_seconds=data.get("batch_delay_seconds", 8),
             skip_existing=data.get("skip_existing", True),
             overwrite_existing=data.get("overwrite_existing", False),
+            model_name=data.get("model_name", "gemini-2.5-flash"),
         )
 
 
@@ -99,6 +106,7 @@ class SentenceConfig:
     translation_field: str = "SentenceTranslation"
     difficulty: str = "Normal"
     highlight_word: bool = True
+    target_language: str = "Korean"
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SentenceConfig":
@@ -109,6 +117,7 @@ class SentenceConfig:
             translation_field=data.get("translation_field", "SentenceTranslation"),
             difficulty=data.get("difficulty", "Normal"),
             highlight_word=data.get("highlight_word", True),
+            target_language=data.get("target_language", "Korean"),
         )
 
 

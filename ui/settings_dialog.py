@@ -10,9 +10,13 @@ Provides:
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Optional, List, Dict, Any, Set
 import threading
 import time
+
+# Get addon directory
+_addon_dir = os.path.dirname(os.path.dirname(__file__))
 
 if TYPE_CHECKING:
     from aqt.main import AnkiQt
@@ -70,7 +74,7 @@ class DeckOperationDialog(QDialog):
         self._config_manager = ConfigManager()
         self._key_manager = get_api_key_manager()
         self._thread_pool = QThreadPool.globalInstance()
-        self._progress_manager = ProgressStateManager()
+        self._progress_manager = ProgressStateManager(_addon_dir)
         
         # Current state
         self._current_deck = ""
