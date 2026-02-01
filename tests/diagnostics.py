@@ -16,12 +16,37 @@ from typing import Dict, Any, List, Optional
 
 # Ensure we can import from the addon
 addon_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+addon_name = os.path.basename(addon_dir)
+
 if addon_dir not in sys.path:
     sys.path.insert(0, addon_dir)
 
-from core.logger import get_logger
-from core.api_key_manager import APIKeyManager
-from core.gemini_client import GeminiClient, GENAI_AVAILABLE
+# Try to import using package-relative style first (when run via standalone_runner)
+# Fall back to direct imports if that fails (when run directly in Anki)
+try:
+    # Check if addon package is set up in sys.modules
+    if addon_name in sys.modules:
+        # Import through the package hierarchy
+        import importlib
+        core_logger = importlib.import_module(f"{addon_name}.core.logger")
+        get_logger = core_logger.get_logger
+        
+        core_api = importlib.import_module(f"{addon_name}.core.api_key_manager")
+        APIKeyManager = core_api.APIKeyManager
+        
+        core_gemini = importlib.import_module(f"{addon_name}.core.gemini_client")
+        GeminiClient = core_gemini.GeminiClient
+        GENAI_AVAILABLE = core_gemini.GENAI_AVAILABLE
+    else:
+        # Direct import (when run within Anki context)
+        from core.logger import get_logger
+        from core.api_key_manager import APIKeyManager
+        from core.gemini_client import GeminiClient, GENAI_AVAILABLE
+except Exception as e:
+    # Fallback to direct import
+    from core.logger import get_logger
+    from core.api_key_manager import APIKeyManager
+    from core.gemini_client import GeminiClient, GENAI_AVAILABLE
 
 # We mock objects if running outside Anki, but this is designed to run IN Anki
 try:
@@ -145,7 +170,13 @@ class StellaDiagnostics:
         status = {"status": "skipped"}
         
         try:
-            from translation.translator import Translator
+            # Import using package-relative path
+            if addon_name in sys.modules:
+                import importlib
+                translator_module = importlib.import_module(f"{addon_name}.translation.translator")
+                Translator = translator_module.Translator
+            else:
+                from translation.translator import Translator
             translator = Translator()
             
             # Test direct generation
@@ -154,7 +185,8 @@ class StellaDiagnostics:
             target_lang = "Spanish"
             
             self._log(f"Translating '{word}' to {target_lang}...")
-            result = translator.translate_text(word, context, target_lang)
+            # Use _generate_translation for direct testing (no Note object needed)
+            result = translator._generate_translation(word, context, target_lang, "gemini-2.5-flash")
             
             if result and len(result) > 0:
                 status["status"] = "success"
@@ -177,7 +209,13 @@ class StellaDiagnostics:
         status = {"status": "skipped"}
         
         try:
-            from sentence.sentence_generator import SentenceGenerator
+            # Import using package-relative path
+            if addon_name in sys.modules:
+                import importlib
+                sentence_module = importlib.import_module(f"{addon_name}.sentence.sentence_generator")
+                SentenceGenerator = sentence_module.SentenceGenerator
+            else:
+                from sentence.sentence_generator import SentenceGenerator
             generator = SentenceGenerator()
             
             # Test generation
@@ -185,7 +223,8 @@ class StellaDiagnostics:
             target_lang = "French"
             
             self._log(f"Generating sentence for '{word}' in {target_lang}...")
-            result = generator.generate_sentences(word, target_lang)
+            # Use generate_sentence_sync for direct testing (no Note object needed)
+            result = generator.generate_sentence_sync(word, target_lang)
             
             if result:
                 status["status"] = "success"
@@ -208,7 +247,13 @@ class StellaDiagnostics:
         status = {"status": "skipped"}
         
         try:
-            from image.prompt_generator import ImagePromptGenerator
+            # Import using package-relative path
+            if addon_name in sys.modules:
+                import importlib
+                image_module = importlib.import_module(f"{addon_name}.image.prompt_generator")
+                ImagePromptGenerator = image_module.ImagePromptGenerator
+            else:
+                from image.prompt_generator import ImagePromptGenerator
             generator = ImagePromptGenerator()
             
             word = "ocean"
@@ -216,13 +261,14 @@ class StellaDiagnostics:
             self._log(f"Generating image prompt for '{word}'...")
             result = generator.generate_prompt(word)
             
-            if result and len(result) > 10:
+            # result is an ImagePromptResult object, check success and prompt length
+            if result and result.success and len(result.prompt) > 10:
                 status["status"] = "success"
-                status["prompt_preview"] = result[:50] + "..."
+                status["prompt_preview"] = result.prompt[:50] + "..."
                 self._log("Image prompt generation success")
             else:
                 status["status"] = "failure"
-                status["reason"] = "Empty or short response"
+                status["reason"] = result.error if result and result.error else "Empty or short response"
                 
         except Exception as e:
             status["status"] = "error"

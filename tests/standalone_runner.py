@@ -34,6 +34,12 @@ sys.modules['anki.notes'] = MagicMock()
 # ==========================================
 current_dir = os.path.dirname(os.path.abspath(__file__))
 addon_dir = os.path.dirname(current_dir)
+addon_parent = os.path.dirname(addon_dir)
+addon_name = os.path.basename(addon_dir)
+
+# Add addon parent directory to path (so addon can be imported as a package)
+if addon_parent not in sys.path:
+    sys.path.insert(0, addon_parent)
 
 # Add addon root to path
 if addon_dir not in sys.path:
@@ -52,6 +58,30 @@ try:
     pass 
 except ImportError:
     pass
+
+# ==========================================
+# 2.5 Setup Addon as Package
+# ==========================================
+# Import the addon directory as a package so relative imports work
+import importlib.util
+import types
+
+# Create a package module for the addon
+addon_package = types.ModuleType(addon_name)
+addon_package.__path__ = [addon_dir]
+addon_package.__file__ = os.path.join(addon_dir, '__init__.py')
+addon_package.__package__ = addon_name
+sys.modules[addon_name] = addon_package
+
+# Pre-register subpackages to enable relative imports
+for subpkg in ['core', 'config', 'translation', 'sentence', 'image', 'ui', 'tests']:
+    subpkg_path = os.path.join(addon_dir, subpkg)
+    if os.path.isdir(subpkg_path):
+        subpkg_module = types.ModuleType(f"{addon_name}.{subpkg}")
+        subpkg_module.__path__ = [subpkg_path]
+        subpkg_module.__file__ = os.path.join(subpkg_path, '__init__.py')
+        subpkg_module.__package__ = f"{addon_name}.{subpkg}"
+        sys.modules[f"{addon_name}.{subpkg}"] = subpkg_module
 
 # ==========================================
 # 3. Run Diagnostics

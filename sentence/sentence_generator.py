@@ -205,30 +205,22 @@ class SentenceGenerator:
         Returns:
             Dictionary with sentence data
         """
-        # Build prompt
+        # Build prompt with explicit JSON format request
         prompt = get_sentence_prompt(word, target_language, difficulty)
-        full_prompt = f"{SENTENCE_SYSTEM_PROMPT}\n\n{prompt}"
+        # Add JSON format instruction with concrete example for structured response
+        json_instruction = f'''
+
+IMPORTANT: Return ONLY a valid JSON object with no markdown, no code fences, and no explanation.
+Example format for word "apple" in Spanish:
+{{"translated_sentence": "Me gusta comer manzanas todos los días.", "english_sentence": "I like to eat apples every day.", "translated_conjugated_word": "manzanas", "english_word": "apples"}}
+
+Now generate for the word "{word}" in {target_language}:'''
+        full_prompt = f"{SENTENCE_SYSTEM_PROMPT}\n\n{prompt}{json_instruction}"
         
-        # Generation config
+        # Generation config (avoid unsupported response_mime_type for compatibility)
         generation_config = {
-            "response_mime_type": "application/json",
-            "response_schema": {
-                "type": "object",
-                "properties": {
-                    "translated_sentence": {"type": "string"},
-                    "english_sentence": {"type": "string"},
-                    "translated_conjugated_word": {"type": "string"},
-                    "english_word": {"type": "string"},
-                },
-                "required": [
-                    "translated_sentence",
-                    "english_sentence",
-                    "translated_conjugated_word",
-                    "english_word",
-                ],
-            },
             "temperature": 0.7,
-            "max_output_tokens": 300,
+            "max_output_tokens": 512,  # Increased to prevent JSON truncation
             "top_p": 0.9,
             "top_k": 40,
         }
