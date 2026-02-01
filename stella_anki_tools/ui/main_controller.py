@@ -1,0 +1,454 @@
+# -*- coding: utf-8 -*-
+"""
+Stella Anki Tools - Main Controller
+
+Central controller that coordinates all features (Translation, Sentence, Image).
+Provides unified interface for menu items, configuration, and feature access.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Optional, Dict, Any, List, Callable
+import os
+
+if TYPE_CHECKING:
+    from aqt.main import AnkiQt
+    from anki.notes import Note
+
+from ..core.logger import get_logger
+from ..core.api_key_manager import APIKeyManager
+from ..config.settings import ConfigManager
+
+
+logger = get_logger(__name__)
+
+
+class StellaAnkiTools:
+    """
+    Main controller for Stella Anki Tools add-on.
+    
+    Coordinates all features and provides:
+    - Menu integration
+    - Settings dialog
+    - API key management
+    - Feature access (translation, sentence, image)
+    """
+    
+    _instance: Optional['StellaAnkiTools'] = None
+    
+    def __new__(cls, *args, **kwargs):
+        """Singleton pattern."""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    def __init__(self, mw: Optional['AnkiQt'] = None):
+        """
+        Initialize main controller.
+        
+        Args:
+            mw: Anki main window instance
+        """
+        if hasattr(self, '_initialized') and self._initialized:
+            return
+        
+        self._mw = mw
+        self._config_manager = ConfigManager()
+        self._key_manager: Optional[APIKeyManager] = None
+        
+        # Feature modules (lazy-loaded)
+        self._translator = None
+        self._sentence_generator = None
+        self._image_generator = None
+        self._prompt_generator = None
+        
+        # Menu items
+        self._menu = None
+        self._menu_actions: List[Any] = []
+        
+        self._initialized = True
+        logger.info("StellaAnkiTools main controller initialized")
+    
+    @property
+    def mw(self) -> 'AnkiQt':
+        """Get Anki main window."""
+        if self._mw is not None:
+            return self._mw
+        
+        try:
+            from aqt import mw
+            return mw
+        except ImportError:
+            raise RuntimeError("Cannot access Anki main window")
+    
+    @property
+    def config(self):
+        """Get current configuration."""
+        return self._config_manager.config
+    
+    @property
+    def key_manager(self) -> APIKeyManager:
+        """Get API key manager (lazy-loaded)."""
+        if self._key_manager is None:
+            self._key_manager = APIKeyManager()
+        return self._key_manager
+    
+    # ========== Feature Access ==========
+    
+    @property
+    def translator(self):
+        """Get translator instance (lazy-loaded)."""
+        if self._translator is None:
+            from ..translation.translator import Translator
+            self._translator = Translator()
+        return self._translator
+    
+    @property
+    def sentence_generator(self):
+        """Get sentence generator instance (lazy-loaded)."""
+        if self._sentence_generator is None:
+            from ..sentence.sentence_generator import SentenceGenerator
+            self._sentence_generator = SentenceGenerator()
+        return self._sentence_generator
+    
+    @property
+    def image_generator(self):
+        """Get image generator instance (lazy-loaded)."""
+        if self._image_generator is None:
+            from ..image.image_generator import ImageGenerator
+            self._image_generator = ImageGenerator(self.key_manager)
+        return self._image_generator
+    
+    @property
+    def prompt_generator(self):
+        """Get image prompt generator instance (lazy-loaded)."""
+        if self._prompt_generator is None:
+            from ..image.prompt_generator import ImagePromptGenerator
+            self._prompt_generator = ImagePromptGenerator()
+        return self._prompt_generator
+    
+    # ========== Menu Integration ==========
+    
+    def setup_menu(self) -> None:
+        """Set up the Stella menu in Anki."""
+        try:
+            from aqt.qt import QMenu, QAction
+            
+            # Create Stella menu
+            self._menu = QMenu("&Stella", self.mw)
+            self.mw.form.menubar.addMenu(self._menu)
+            
+            # Settings action
+            settings_action = QAction("⚙️ Settings...", self.mw)
+            settings_action.triggered.connect(self.show_settings_dialog)
+            self._menu.addAction(settings_action)
+            self._menu_actions.append(settings_action)
+            
+            self._menu.addSeparator()
+            
+            # API Key Management
+            api_action = QAction("🔑 Manage API Keys...", self.mw)
+            api_action.triggered.connect(self.show_api_key_dialog)
+            self._menu.addAction(api_action)
+            self._menu_actions.append(api_action)
+            
+            # Test API Connection
+            test_action = QAction("🧪 Test API Connection", self.mw)
+            test_action.triggered.connect(self.test_api_connection)
+            self._menu.addAction(test_action)
+            self._menu_actions.append(test_action)
+            
+            self._menu.addSeparator()
+            
+            # Feature shortcuts
+            translate_action = QAction("🌐 Translate Selected Notes...", self.mw)
+            translate_action.triggered.connect(self.translate_selected_notes)
+            self._menu.addAction(translate_action)
+            self._menu_actions.append(translate_action)
+            
+            sentence_action = QAction("✏️ Generate Sentences...", self.mw)
+            sentence_action.triggered.connect(self.generate_sentences_selected)
+            self._menu.addAction(sentence_action)
+            self._menu_actions.append(sentence_action)
+            
+            image_action = QAction("🖼️ Generate Images...", self.mw)
+            image_action.triggered.connect(self.generate_images_selected)
+            self._menu.addAction(image_action)
+            self._menu_actions.append(image_action)
+            
+            self._menu.addSeparator()
+            
+            # Statistics
+            stats_action = QAction("📊 API Statistics", self.mw)
+            stats_action.triggered.connect(self.show_statistics)
+            self._menu.addAction(stats_action)
+            self._menu_actions.append(stats_action)
+            
+            # About
+            about_action = QAction("ℹ️ About Stella", self.mw)
+            about_action.triggered.connect(self.show_about)
+            self._menu.addAction(about_action)
+            self._menu_actions.append(about_action)
+            
+            logger.info("Stella menu created")
+            
+        except Exception as e:
+            logger.error(f"Failed to create menu: {e}")
+    
+    # ========== Dialogs ==========
+    
+    def show_settings_dialog(self) -> None:
+        """Show the settings dialog."""
+        try:
+            from .settings_dialog import StellaSettingsDialog
+            dialog = StellaSettingsDialog(self.mw, self._config_manager)
+            dialog.exec()
+        except ImportError:
+            # Fallback: open Anki's add-on config
+            from aqt.utils import showInfo
+            showInfo(
+                "Settings dialog not yet implemented.\n"
+                "Please use Tools → Add-ons → Stella Anki Tools → Config"
+            )
+        except Exception as e:
+            logger.error(f"Failed to show settings dialog: {e}")
+            from aqt.utils import showWarning
+            showWarning(f"Failed to open settings: {e}")
+    
+    def show_api_key_dialog(self) -> None:
+        """Show the API key management dialog."""
+        try:
+            from .settings_dialog import APIKeyDialog
+            dialog = APIKeyDialog(self.mw, self.key_manager)
+            dialog.exec()
+        except ImportError:
+            # Simple fallback
+            from aqt.utils import getText, showInfo
+            
+            current_keys = len(self.key_manager.get_all_keys())
+            text, ok = getText(
+                f"Enter API key (currently have {current_keys} keys):",
+                parent=self.mw,
+                title="Add API Key"
+            )
+            
+            if ok and text.strip():
+                self.key_manager.add_key(text.strip())
+                showInfo(f"API key added. Total keys: {len(self.key_manager.get_all_keys())}")
+        except Exception as e:
+            logger.error(f"Failed to show API key dialog: {e}")
+    
+    def show_statistics(self) -> None:
+        """Show API usage statistics."""
+        try:
+            from aqt.utils import showInfo
+            
+            stats = self.key_manager.get_statistics()
+            
+            msg = "📊 Stella API Statistics\n\n"
+            msg += f"Total Keys: {stats.get('total_keys', 0)}\n"
+            msg += f"Active Keys: {stats.get('active_keys', 0)}\n"
+            msg += f"Total Requests: {stats.get('total_requests', 0)}\n"
+            msg += f"Total Tokens: {stats.get('total_tokens', 0)}\n"
+            msg += f"Success Rate: {stats.get('success_rate', 0):.1%}\n"
+            
+            showInfo(msg, title="Stella Statistics")
+            
+        except Exception as e:
+            logger.error(f"Failed to show statistics: {e}")
+    
+    def show_about(self) -> None:
+        """Show about dialog."""
+        from aqt.utils import showInfo
+        
+        msg = """
+🌟 Stella Anki Tools
+
+A unified AI-powered toolkit for Anki flashcards.
+
+Features:
+• 🌐 AI Translation - Translate cards to any language
+• ✏️ AI Sentences - Generate example sentences
+• 🖼️ AI Images - Create images from vocabulary
+
+Powered by Google Gemini API
+
+Version: 1.0.0
+"""
+        showInfo(msg, title="About Stella Anki Tools")
+    
+    # ========== API Testing ==========
+    
+    def test_api_connection(self) -> None:
+        """Test API connection with current key."""
+        from aqt.utils import showInfo, showWarning
+        
+        api_key = self.key_manager.get_current_key()
+        if not api_key:
+            showWarning("No API key configured. Please add an API key first.")
+            return
+        
+        try:
+            from ..core.gemini_client import GeminiClient
+            client = GeminiClient(self.key_manager)
+            
+            # Simple test
+            result = client.generate_text("Say 'Hello, Stella is working!'")
+            
+            if result.success:
+                showInfo(
+                    f"✅ API Connection Successful!\n\n"
+                    f"Response: {result.text[:200]}...\n\n"
+                    f"Tokens used: {result.tokens_used}",
+                    title="API Test"
+                )
+            else:
+                showWarning(f"❌ API Test Failed:\n{result.error}")
+                
+        except Exception as e:
+            showWarning(f"❌ API Test Error:\n{e}")
+    
+    # ========== Feature Actions ==========
+    
+    def translate_selected_notes(self) -> None:
+        """Translate currently selected notes in browser."""
+        try:
+            # Get selected notes from browser
+            browser = self._get_active_browser()
+            if not browser:
+                from aqt.utils import showWarning
+                showWarning("Please open the card browser and select notes to translate.")
+                return
+            
+            note_ids = browser.selectedNotes()
+            if not note_ids:
+                from aqt.utils import showWarning
+                showWarning("Please select notes to translate.")
+                return
+            
+            # Start batch translation
+            from .progress_dialog import show_batch_progress
+            from ..translation.batch_translator import BatchTranslator
+            
+            batch = BatchTranslator(
+                note_ids=list(note_ids),
+                config=self.config.translation
+            )
+            
+            show_batch_progress(
+                self.mw,
+                batch,
+                title="Translating Notes",
+                on_complete=lambda results: self._on_batch_complete("Translation", results)
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to translate selected notes: {e}")
+            from aqt.utils import showWarning
+            showWarning(f"Translation failed: {e}")
+    
+    def generate_sentences_selected(self) -> None:
+        """Generate sentences for selected notes."""
+        try:
+            browser = self._get_active_browser()
+            if not browser:
+                from aqt.utils import showWarning
+                showWarning("Please open the card browser and select notes.")
+                return
+            
+            note_ids = browser.selectedNotes()
+            if not note_ids:
+                from aqt.utils import showWarning
+                showWarning("Please select notes for sentence generation.")
+                return
+            
+            from aqt.utils import showInfo
+            showInfo(f"Sentence generation for {len(note_ids)} notes.\n(Feature coming soon)")
+            
+        except Exception as e:
+            logger.error(f"Failed to generate sentences: {e}")
+    
+    def generate_images_selected(self) -> None:
+        """Generate images for selected notes."""
+        try:
+            browser = self._get_active_browser()
+            if not browser:
+                from aqt.utils import showWarning
+                showWarning("Please open the card browser and select notes.")
+                return
+            
+            note_ids = browser.selectedNotes()
+            if not note_ids:
+                from aqt.utils import showWarning
+                showWarning("Please select notes for image generation.")
+                return
+            
+            from aqt.utils import showInfo
+            showInfo(f"Image generation for {len(note_ids)} notes.\n(Feature coming soon)")
+            
+        except Exception as e:
+            logger.error(f"Failed to generate images: {e}")
+    
+    def _get_active_browser(self):
+        """Get the active browser window if any."""
+        try:
+            from aqt.browser import Browser
+            
+            for window in self.mw.app.topLevelWidgets():
+                if isinstance(window, Browser) and window.isVisible():
+                    return window
+            return None
+        except Exception:
+            return None
+    
+    def _on_batch_complete(self, feature: str, results: Dict[str, Any]) -> None:
+        """Handle batch operation completion."""
+        from aqt.utils import showInfo
+        
+        success = results.get("successful", 0)
+        total = results.get("total", 0)
+        failed = results.get("failed", 0)
+        
+        msg = f"{feature} Complete\n\n"
+        msg += f"✅ Successful: {success}/{total}\n"
+        
+        if failed > 0:
+            msg += f"❌ Failed: {failed}\n"
+        
+        showInfo(msg, title=f"{feature} Results")
+    
+    # ========== Cleanup ==========
+    
+    def cleanup(self) -> None:
+        """Clean up resources on unload."""
+        try:
+            # Save any pending state
+            if self._key_manager:
+                self._key_manager.save_state()
+            
+            self._config_manager.save()
+            
+            logger.info("StellaAnkiTools cleanup complete")
+            
+        except Exception as e:
+            logger.error(f"Cleanup error: {e}")
+
+
+# Module-level access
+_controller: Optional[StellaAnkiTools] = None
+
+
+def get_controller() -> StellaAnkiTools:
+    """Get the main controller singleton."""
+    global _controller
+    if _controller is None:
+        _controller = StellaAnkiTools()
+    return _controller
+
+
+def initialize(mw: 'AnkiQt') -> StellaAnkiTools:
+    """Initialize the main controller with Anki main window."""
+    global _controller
+    _controller = StellaAnkiTools(mw)
+    _controller.setup_menu()
+    return _controller

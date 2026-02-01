@@ -1,0 +1,12 @@
+{
+    "name": "Stella Anki Tools",
+    "package": "stella_anki_tools",
+    "ankiweb_id": "",
+    "author": "Stella Anki Team",
+    "version": "1.0.0",
+    "min_point_version": 50,
+    "max_point_version": 231001,
+    "homepage": "https://github.com/Hyoni1129/Stella_Anki_All_in_one_Addon",
+    "conflicts": [],
+    "mod": 1738368000
+}
