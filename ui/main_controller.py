@@ -243,14 +243,15 @@ class StellaAnkiTools:
         try:
             from aqt.utils import showInfo
             
-            stats = self.key_manager.get_statistics()
+            stats = self.key_manager.get_summary_stats()
             
             msg = "📊 Stella API Statistics\n\n"
             msg += f"Total Keys: {stats.get('total_keys', 0)}\n"
             msg += f"Active Keys: {stats.get('active_keys', 0)}\n"
             msg += f"Total Requests: {stats.get('total_requests', 0)}\n"
-            msg += f"Total Tokens: {stats.get('total_tokens', 0)}\n"
-            msg += f"Success Rate: {stats.get('success_rate', 0):.1%}\n"
+            msg += f"Successful: {stats.get('successful_requests', 0)}\n"
+            msg += f"Failed: {stats.get('failed_requests', 0)}\n"
+            msg += f"Success Rate: {stats.get('success_rate', 0):.1f}%\n"
             
             showInfo(msg, title="Stella Statistics")
             
@@ -289,21 +290,29 @@ Version: 1.0.0
             return
         
         try:
-            from ..core.gemini_client import GeminiClient
-            client = GeminiClient(self.key_manager)
+            from ..core.gemini_client import GeminiClient, GENAI_AVAILABLE
             
-            # Simple test
-            result = client.generate_text("Say 'Hello, Stella is working!'")
+            if not GENAI_AVAILABLE:
+                showWarning(
+                    "❌ API Test Error:\n"
+                    "The google-generativeai package is not available.\n\n"
+                    "This addon requires the Google Generative AI SDK.\n"
+                    "Please install it via pip:\n\n"
+                    "pip install google-generativeai"
+                )
+                return
             
-            if result.success:
+            client = GeminiClient(api_key=api_key)
+            success, message = client.test_connection()
+            
+            if success:
                 showInfo(
                     f"✅ API Connection Successful!\n\n"
-                    f"Response: {result.text[:200]}...\n\n"
-                    f"Tokens used: {result.tokens_used}",
+                    f"{message}",
                     title="API Test"
                 )
             else:
-                showWarning(f"❌ API Test Failed:\n{result.error}")
+                showWarning(f"❌ API Test Failed:\n{message}")
                 
         except Exception as e:
             showWarning(f"❌ API Test Error:\n{e}")

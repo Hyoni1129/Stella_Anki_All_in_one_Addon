@@ -102,14 +102,14 @@ class APIKeyDialog:
         """Show key statistics."""
         from aqt.utils import showInfo
         
-        stats = self._key_manager.get_statistics()
+        stats = self._key_manager.get_summary_stats()
         
         msg = "📊 API Key Statistics\n\n"
         msg += f"Total Keys: {stats.get('total_keys', 0)}\n"
         msg += f"Active Keys: {stats.get('active_keys', 0)}\n"
-        msg += f"Current Key Index: {stats.get('current_index', 0)}\n"
+        msg += f"Current Key Index: {stats.get('current_key_index', 0)}\n"
         msg += f"Total Requests: {stats.get('total_requests', 0)}\n"
-        msg += f"Total Tokens: {stats.get('total_tokens', 0)}\n"
+        msg += f"Success Rate: {stats.get('success_rate', 0):.1f}%\n"
         
         showInfo(msg, title="API Statistics")
     
