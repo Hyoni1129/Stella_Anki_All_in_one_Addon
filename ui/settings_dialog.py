@@ -1428,28 +1428,91 @@ class DeckOperationDialog(QDialog):
         showInfo(msg, title="API Statistics")
     
     def _test_api_connection(self) -> None:
-        """Test API connection."""
+        """
+        Test API connection with comprehensive error detection.
+        
+        Uses JSON schema validation to properly test the API endpoint
+        and provides detailed error classification for common issues.
+        """
         api_key = self._key_manager.get_current_key()
         if not api_key:
-            showWarning("No API key configured.")
+            showWarning("No API key configured. Please add an API key first.")
             return
         
         self._status_label.setText("Testing API connection...")
         
+        # Disable test button temporarily
+        test_btn = self.sender()
+        if test_btn:
+            test_btn.setEnabled(False)
+            test_btn.setText("Testing...")
+        
         try:
-            from ..core.gemini_client import get_gemini_client
-            client = get_gemini_client()
-            response = client.generate_text("Say 'Hello'", max_retries=1)
+            from ..core.api_tester import test_api_connection
             
-            if response:
-                showInfo("✅ API connection successful!")
+            # Get current model and language settings
+            model_name = self._config_manager.config.translation.model
+            language = self._config_manager.config.translation.language
+            
+            success, message = test_api_connection(
+                api_key=api_key,
+                language=language,
+                model_name=model_name
+            )
+            
+            if success:
+                showInfo(f"✅ {message}")
             else:
-                showWarning("API returned empty response.")
+                showWarning(f"❌ API Test Failed:\n\n{message}")
+                
+        except ImportError:
+            # Fallback to simple test if api_tester not available
+            try:
+                from ..core.gemini_client import get_gemini_client
+                client = get_gemini_client()
+                response = client.generate_text("Say 'Hello'", max_retries=1)
+                
+                if response:
+                    showInfo("✅ API connection successful!")
+                else:
+                    showWarning("API returned empty response.")
+            except Exception as e:
+                self._handle_api_test_error(e)
                 
         except Exception as e:
-            showWarning(f"API test failed:\n{e}")
+            self._handle_api_test_error(e)
         
-        self._status_label.setText("Ready")
+        finally:
+            # Re-enable test button
+            if test_btn:
+                test_btn.setEnabled(True)
+                test_btn.setText("Test Connection")
+            self._status_label.setText("Ready")
+    
+    def _handle_api_test_error(self, error: Exception) -> None:
+        """Handle and classify API test errors with helpful messages."""
+        error_msg = str(error).lower()
+        error_type = type(error).__name__
+        
+        # Classify the error for user-friendly messages
+        if "api key" in error_msg or "api_key" in error_msg:
+            showWarning("❌ Invalid API Key\n\nPlease check your API key is correct.")
+        elif "resource exhausted" in error_msg or "quota exceeded" in error_msg:
+            showWarning("❌ API Quota Exceeded\n\nYour API quota has been exhausted. "
+                       "Please wait or try a different API key.")
+        elif "rate limit" in error_msg or "too many requests" in error_msg or "429" in str(error):
+            showWarning("❌ Rate Limit Reached\n\nPlease wait a moment and try again.")
+        elif "permission" in error_msg or "forbidden" in error_msg:
+            showWarning("❌ Permission Denied\n\nYour API key may not have access to this model.")
+        elif "model" in error_msg and ("not found" in error_msg or "does not exist" in error_msg):
+            showWarning("❌ Model Not Found\n\nThe selected model may not be available. "
+                       "Try using 'gemini-2.5-flash' instead.")
+        elif "connection" in error_msg or "timeout" in error_msg or "network" in error_msg:
+            showWarning("❌ Network Error\n\nPlease check your internet connection.")
+        elif "invalid" in error_msg or "bad request" in error_msg:
+            showWarning(f"❌ Invalid Request\n\n{error}")
+        else:
+            showWarning(f"❌ API Test Failed ({error_type}):\n\n{error}")
 
 
 # Legacy classes for backward compatibility

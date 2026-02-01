@@ -20,6 +20,7 @@ import re
 import time
 import base64
 import hashlib
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any, Callable
 from dataclasses import dataclass, field, asdict
@@ -208,15 +209,20 @@ class APIKeyManager:
     - Usage statistics per key
     - Event listeners for UI updates
     - Encrypted storage for API keys
+    - Thread-safe singleton pattern
     """
     
     _instance: Optional["APIKeyManager"] = None
+    _lock: threading.Lock = threading.Lock()
     
     def __new__(cls, addon_dir: Optional[str] = None) -> "APIKeyManager":
-        """Singleton pattern to ensure single instance."""
+        """Thread-safe singleton pattern to ensure single instance."""
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+            with cls._lock:
+                # Double-check locking pattern
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
         return cls._instance
     
     def __init__(self, addon_dir: Optional[str] = None) -> None:

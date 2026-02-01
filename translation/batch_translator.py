@@ -58,7 +58,16 @@ class BatchTranslator(QRunnable):
     - Automatic API key rotation on failures
     - Progress reporting via signals
     - Cancellation support
+    
+    Note on default values:
+        - batch_size=5 (vs Reference's 10): More conservative for stability
+        - batch_delay_seconds=8.0 (vs Reference's 5.0): Longer delay to avoid rate limits
+        These conservative defaults prioritize reliability over speed.
     """
+    
+    # Default constants (documented for reference)
+    DEFAULT_BATCH_SIZE = 5  # Reference uses 10, we use 5 for stability
+    DEFAULT_BATCH_DELAY = 8.0  # Reference uses 5.0, we use 8.0 for rate limit safety
     
     def __init__(
         self,
@@ -66,8 +75,8 @@ class BatchTranslator(QRunnable):
         target_language: str,
         destination_field: str,
         model_name: str = "gemini-2.5-flash",
-        batch_size: int = 5,
-        batch_delay_seconds: float = 8.0,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        batch_delay_seconds: float = DEFAULT_BATCH_DELAY,
         ignore_errors: bool = True,
         cancel_event: Optional[threading.Event] = None,
         addon_dir: Optional[str] = None,
@@ -80,8 +89,8 @@ class BatchTranslator(QRunnable):
             target_language: Target language for translation
             destination_field: Field to store translations
             model_name: Gemini model to use
-            batch_size: Number of words per API call
-            batch_delay_seconds: Delay between batches
+            batch_size: Number of words per API call (default: 5 for stability)
+            batch_delay_seconds: Delay between batches (default: 8.0s for rate limit safety)
             ignore_errors: Continue on errors if True
             cancel_event: Event to signal cancellation
             addon_dir: Add-on directory path
