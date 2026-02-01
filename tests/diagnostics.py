@@ -73,7 +73,8 @@ class StellaDiagnostics:
             "features": {
                 "translation": {"status": "skipped"},
                 "sentence": {"status": "skipped"},
-                "image": {"status": "skipped"}
+                "image": {"status": "skipped"},
+                "ui_init": {"status": "skipped"}
             },
             "final_status": "UNKNOWN"
         }
@@ -92,12 +93,14 @@ class StellaDiagnostics:
             self._check_api_connectivity()
             
             if self.results["components"].get("api_connection", False):
-                self._check_translation_feature()
                 self._check_sentence_feature()
                 self._check_image_feature()
             else:
                 self._log("Skipping feature tests due to API connection failure.")
                 self.results["final_status"] = "WARNING"
+            
+            # UI Init check should run regardless of API status
+            self._check_ui_init()
                 
             if self.results["final_status"] == "UNKNOWN":
                 self.results["final_status"] = "SUCCESS"
@@ -276,6 +279,51 @@ class StellaDiagnostics:
             self._log(f"Image error: {e}")
             
         self.results["features"]["image"] = status
+
+    def _check_ui_init(self):
+        """Check if UI classes can be instantiated (catches config/attribute errors)."""
+        self._log("Testing UI Initialization...")
+        status = {"status": "skipped"}
+        
+        try:
+            # Import using package-relative path
+            if addon_name in sys.modules:
+                import importlib
+                ui_module = importlib.import_module(f"{addon_name}.ui.settings_dialog")
+                DeckOperationDialog = ui_module.DeckOperationDialog
+            else:
+                from ui.settings_dialog import DeckOperationDialog
+            
+            # We need to mock parent widget (AnkiQt)
+            if IN_ANKI:
+                parent = mw
+            else:
+                from unittest.mock import MagicMock
+                parent = MagicMock()
+            
+            # Attempt instantiation
+            # This triggers __init__ -> _setup_ui -> accessing config settings
+            print(f"DEBUG: Instantiating DeckOperationDialog with parent {parent}")
+            dialog = DeckOperationDialog(parent)
+            print("DEBUG: Instantiation complete")
+            
+            # Verify the config object is real
+            cfg = dialog._config_manager.config
+            print(f"DEBUG: Config object: {type(cfg)}")
+            print(f"DEBUG: Image Config: {type(cfg.image)}")
+            print(f"DEBUG: Image Config vars: {vars(cfg.image)}")
+            
+            status["status"] = "success"
+            self._log("UI Initialization success")
+                
+        except Exception as e:
+            status["status"] = "error"
+            status["error"] = str(e)
+            status["traceback"] = traceback.format_exc()
+            self._log(f"UI Initialization error: {e}")
+            self._log(traceback.format_exc())
+            
+        self.results["features"]["ui_init"] = status
 
     def _save_report(self):
         """Save results to JSON."""

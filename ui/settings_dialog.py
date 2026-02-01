@@ -522,7 +522,7 @@ class DeckOperationDialog(QDialog):
             "sketch", "minimalist", "cartoon", "pixel_art"
         ])
         self._style_dropdown.setCurrentText(
-            self._config_manager.config.image.default_style
+            self._config_manager.config.image.style_preset
         )
         style_row.addWidget(self._style_dropdown, 1)
         options_layout.addLayout(style_row)
