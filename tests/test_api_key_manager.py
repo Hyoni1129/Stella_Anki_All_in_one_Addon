@@ -40,7 +40,7 @@ class TestEncryption(unittest.TestCase):
         key = _derive_encryption_key("test_password")
         
         test_strings = [
-            "AIzaSyTestKey1234567890abcdefghijklmn",
+            "AIza_DUMMY_KEY_FOR_TESTING_PURPOSES_LONG_STRING",
             "simple",
             "with spaces and special chars!@#$%",
             "",
@@ -54,7 +54,7 @@ class TestEncryption(unittest.TestCase):
     def test_encrypted_differs_from_original(self):
         """Test that encrypted data differs from original."""
         key = _derive_encryption_key("test_password")
-        original = "AIzaSyTestKey1234567890abcdefghijklmn"
+        original = "AIza_DUMMY_KEY_FOR_TESTING_PURPOSES"
         
         encrypted = _simple_encrypt(original, key)
         
@@ -83,7 +83,7 @@ class TestAPIKeyManagerState(unittest.TestCase):
         key = _derive_encryption_key("test")
         state = APIKeyManagerState(
             current_key_index=0,
-            keys=["AIzaSyTestKey123", "AIzaSyTestKey456"],
+            keys=["AIza_DUMMY_1", "AIza_DUMMY_2"],
         )
         
         data = state.to_dict(encrypt=True, encryption_key=key)
@@ -96,7 +96,7 @@ class TestAPIKeyManagerState(unittest.TestCase):
     def test_from_dict_decryption(self):
         """Test state deserialization with decryption."""
         key = _derive_encryption_key("test")
-        original_keys = ["AIzaSyTestKey123", "AIzaSyTestKey456"]
+        original_keys = ["AIza_DUMMY_1", "AIza_DUMMY_2"]
         
         # First encrypt
         state = APIKeyManagerState(keys=original_keys)
@@ -134,12 +134,12 @@ class TestAPIKeyManager(unittest.TestCase):
         manager = APIKeyManager(self.temp_dir)
         
         # Add valid key
-        success, message = manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
+        success, message = manager.add_key("AIza_DUMMY_KEY_FOR_TESTING_1")
         self.assertTrue(success)
         self.assertEqual(len(manager.get_all_keys()), 1)
         
         # Duplicate key should fail
-        success, message = manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
+        success, message = manager.add_key("AIza_DUMMY_KEY_FOR_TESTING_1")
         self.assertFalse(success)
     
     def test_key_validation(self):
@@ -155,15 +155,15 @@ class TestAPIKeyManager(unittest.TestCase):
         self.assertFalse(success)
         
         # Valid
-        success, message = manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
+        success, message = manager.add_key("AIza_DUMMY_KEY_FOR_TESTING_1")
         self.assertTrue(success)
     
     def test_remove_key(self):
         """Test removing API keys."""
         manager = APIKeyManager(self.temp_dir)
         
-        manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
-        manager.add_key("AIzaSyTestKey9876543210abcdefghijklmn")
+        manager.add_key("AIza_DUMMY_KEY_FOR_TESTING_1")
+        manager.add_key("AIza_DUMMY_KEY_FOR_TESTING_2")
         
         self.assertEqual(len(manager.get_all_keys()), 2)
         
@@ -177,13 +177,13 @@ class TestAPIKeyManager(unittest.TestCase):
         
         self.assertIsNone(manager.get_current_key())
         
-        manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
+        manager.add_key("AIza_DUMMY_KEY_FOR_TESTING_1")
         self.assertIsNotNone(manager.get_current_key())
     
     def test_record_success(self):
         """Test recording successful requests."""
         manager = APIKeyManager(self.temp_dir)
-        manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
+        manager.add_key("AIza_DUMMY_KEY_FOR_TESTING_1")
         
         manager.record_success("translation", count=10)
         
@@ -195,8 +195,8 @@ class TestAPIKeyManager(unittest.TestCase):
     def test_record_failure_triggers_rotation(self):
         """Test that consecutive failures trigger key rotation."""
         manager = APIKeyManager(self.temp_dir)
-        manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
-        manager.add_key("AIzaSyTestKey9876543210abcdefghijklmn")
+        manager.add_key("AIza_DUMMY_KEY_FOR_TESTING_1")
+        manager.add_key("AIza_DUMMY_KEY_FOR_TESTING_2")
         
         # Record failures up to threshold
         for _ in range(FAILURE_THRESHOLD):
@@ -209,7 +209,7 @@ class TestAPIKeyManager(unittest.TestCase):
         """Test that state persists across instances."""
         # Create and add key
         manager1 = APIKeyManager(self.temp_dir)
-        manager1.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
+        manager1.add_key("AIza_DUMMY_KEY_FOR_TESTING_1")
         
         # Reset singleton
         APIKeyManager._instance = None
