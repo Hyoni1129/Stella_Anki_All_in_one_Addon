@@ -201,7 +201,7 @@ class ImageGenerator:
                     self._stats["total_generation_time"] += generation_time
                     
                     # Record success with key manager
-                    self.key_manager.record_success()
+                    self.key_manager.record_success(operation="image")
                     
                     # Get image dimensions if PIL is available
                     width, height = self._get_image_dimensions(image_data)
@@ -226,11 +226,11 @@ class ImageGenerator:
                 error_type, error_msg = classify_error(e)
                 logger.warning(f"Image generation attempt {attempt + 1} failed: {error_type} - {error_msg}")
                 
-                # Check if we should rotate API key
+                # Record failure and let key manager handle rotation internally
                 if error_type in ("rate_limit", "quota_exceeded", "auth_error"):
-                    self.key_manager.record_failure(error_type)
-                    if self.key_manager.rotate_to_next_key():
-                        logger.info("Rotated to next API key")
+                    rotated, new_key_id = self.key_manager.record_failure(error_type)
+                    if rotated:
+                        logger.info(f"Rotated to next API key: {new_key_id}")
                         self._reinitialize_with_new_key()
                 
                 if attempt < self.max_retries - 1:

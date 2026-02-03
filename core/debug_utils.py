@@ -101,7 +101,7 @@ def _check_configuration(mw) -> None:
                 config = json.load(f)
             print(f"   - Version: {config.get('version', 'unknown')}")
             print(f"   - Translation Language: {config.get('translation', {}).get('language', 'not set')}")
-            print(f"   - Translation Model: {config.get('translation', {}).get('model', 'not set')}")
+            print(f"   - Translation Model: {config.get('translation', {}).get('model_name', 'not set')}")
         else:
             print("⚠️ config.json not found (using defaults)")
         

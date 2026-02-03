@@ -24,6 +24,17 @@ _lib_path = os.path.join(_addon_dir, "lib")
 if _lib_path not in sys.path:
     sys.path.insert(0, _lib_path)
 
+# Handle google namespace package - required when other addons also use google packages
+try:
+    if "google" in sys.modules:
+        import google
+        if hasattr(google, "__path__"):
+            google_lib_path = os.path.join(_lib_path, "google")
+            if google_lib_path not in google.__path__:
+                google.__path__.append(google_lib_path)
+except Exception:
+    pass
+
 try:
     import google.generativeai as genai
     GENAI_AVAILABLE = True
@@ -58,7 +69,14 @@ def test_api_connection(
             return False, "API key is empty"
         
         if not GENAI_AVAILABLE:
-            return False, "google-generativeai package is not available"
+            return False, (
+                "The Google AI SDK could not be loaded.\n\n"
+                "This may happen if:\n"
+                "• Another Anki addon is conflicting with this one\n"
+                "• The addon's lib folder is missing or corrupted\n\n"
+                "Try restarting Anki. If the problem persists, "
+                "reinstall this addon from AnkiWeb."
+            )
         
         logger.info(f"Starting API connection test with model: {model_name}")
         

@@ -80,6 +80,14 @@ When analyzing an error, verify these common root causes first:
     *   **Cause:** Validation of key rotation logic failure.
     *   **Fix:** Check `core/api_key_manager.py` logic.
 
+## 🛡️ Code Quality & Static Analysis (SonarQube)
+
+Ensure code reliability and security by using SonarQube tools during the development process:
+
+1.  **Analyze Active Files:** Run `sonarqube_analyze_file` on any file you are modifying to detect existing bugs or code smells.
+2.  **Fix Issues:** Prioritize resolving **Critical** and **Major** issues (Bugs, Vulnerabilities) identified by the scan.
+3.  **Security Check:** Use `sonarqube_list_potential_security_issues` to verify that no new security hotspots are introduced.
+
 ---
 
 **Instructions for the Agent:**

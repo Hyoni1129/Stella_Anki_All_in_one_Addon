@@ -82,6 +82,7 @@ class ImageConfig:
     max_height: int = 600
     batch_size: int = 5
     request_delay_seconds: float = 2.0
+    custom_prompts: Dict[str, str] = field(default_factory=dict)  # Custom style prompts
 
     @property
     def default_style(self) -> str:
@@ -103,6 +104,7 @@ class ImageConfig:
             max_height=data.get("max_height", 600),
             batch_size=data.get("batch_size", 5),
             request_delay_seconds=data.get("request_delay_seconds", 2.0),
+            custom_prompts=data.get("custom_prompts", {}),
         )
 
 

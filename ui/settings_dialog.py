@@ -94,11 +94,15 @@ class DeckOperationDialog(QDialog):
         self._source_dropdown: Optional[QComboBox] = None
         self._context_dropdown: Optional[QComboBox] = None
         self._dest_dropdown: Optional[QComboBox] = None
+        self._sentence_word_dropdown: Optional[QComboBox] = None
         self._sentence_field_dropdown: Optional[QComboBox] = None
         self._sentence_trans_dropdown: Optional[QComboBox] = None
+        self._image_word_dropdown: Optional[QComboBox] = None
         self._image_field_dropdown: Optional[QComboBox] = None
         self._language_dropdown: Optional[QComboBox] = None
         self._model_dropdown: Optional[QComboBox] = None
+        self._style_dropdown: Optional[QComboBox] = None
+        self._prompt_edit: Optional[QTextEdit] = None
         self._batch_size_spin: Optional[QSpinBox] = None
         self._delay_spin: Optional[QSpinBox] = None
         self._progress_bar: Optional[QProgressBar] = None
@@ -175,6 +179,15 @@ class DeckOperationDialog(QDialog):
         self.setMinimumHeight(700)
         
         layout = QVBoxLayout(self)
+        
+        # Shared Deck Selection (visible across all tabs)
+        deck_group = QGroupBox("Select Deck")
+        deck_group_layout = QHBoxLayout(deck_group)
+        deck_group_layout.addWidget(QLabel("Deck:"))
+        self._deck_dropdown = QComboBox()
+        self._deck_dropdown.currentTextChanged.connect(self._on_deck_changed)
+        deck_group_layout.addWidget(self._deck_dropdown, 1)
+        layout.addWidget(deck_group)
         
         # Create tab widget
         tab_widget = QTabWidget()
@@ -262,14 +275,6 @@ class DeckOperationDialog(QDialog):
         header = QLabel("Batch Translation")
         header.setStyleSheet("font-weight: bold; font-size: 14px;")
         layout.addWidget(header)
-        
-        # Deck selection
-        deck_layout = QHBoxLayout()
-        deck_layout.addWidget(QLabel("Deck:"))
-        self._deck_dropdown = QComboBox()
-        self._deck_dropdown.currentTextChanged.connect(self._on_deck_changed)
-        deck_layout.addWidget(self._deck_dropdown, 1)
-        layout.addLayout(deck_layout)
         
         # Field mappings
         fields_group = QGroupBox("Field Mapping")
@@ -523,11 +528,11 @@ class DeckOperationDialog(QDialog):
         
         layout.addWidget(fields_group)
         
-        # Options
-        options_group = QGroupBox("Options")
+        # Style and Prompt Options
+        options_group = QGroupBox("Style & Prompt Options")
         options_layout = QVBoxLayout(options_group)
         
-        # Style
+        # Style selection row
         style_row = QHBoxLayout()
         style_row.addWidget(QLabel("Image Style:"))
         self._style_dropdown = QComboBox()
@@ -538,8 +543,35 @@ class DeckOperationDialog(QDialog):
         self._style_dropdown.setCurrentText(
             self._config_manager.config.image.style_preset
         )
+        self._style_dropdown.currentTextChanged.connect(self._on_style_changed)
         style_row.addWidget(self._style_dropdown, 1)
         options_layout.addLayout(style_row)
+        
+        # Prompt editing area
+        prompt_label = QLabel("Style Prompt (editable):")
+        prompt_label.setStyleSheet("margin-top: 8px;")
+        options_layout.addWidget(prompt_label)
+        
+        self._prompt_edit = QTextEdit()
+        self._prompt_edit.setPlaceholderText("Select a style to view/edit its prompt...")
+        self._prompt_edit.setMaximumHeight(120)
+        self._prompt_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+        options_layout.addWidget(self._prompt_edit)
+        
+        # Prompt action buttons
+        prompt_btn_row = QHBoxLayout()
+        
+        self._reset_prompt_btn = QPushButton("Reset to Default")
+        self._reset_prompt_btn.clicked.connect(self._reset_style_prompt)
+        prompt_btn_row.addWidget(self._reset_prompt_btn)
+        
+        self._save_prompt_btn = QPushButton("Save Custom Prompt")
+        self._save_prompt_btn.setStyleSheet("background-color: #28a745; color: white;")
+        self._save_prompt_btn.clicked.connect(self._save_style_prompt)
+        prompt_btn_row.addWidget(self._save_prompt_btn)
+        
+        prompt_btn_row.addStretch()
+        options_layout.addLayout(prompt_btn_row)
         
         # Skip existing
         self._skip_image_cb = QCheckBox("Skip cards with existing images")
@@ -547,6 +579,9 @@ class DeckOperationDialog(QDialog):
         options_layout.addWidget(self._skip_image_cb)
         
         layout.addWidget(options_group)
+        
+        # Initialize prompt display
+        self._on_style_changed(self._style_dropdown.currentText())
         
         # Action buttons
         button_row = QHBoxLayout()
@@ -566,6 +601,60 @@ class DeckOperationDialog(QDialog):
         layout.addStretch()
         
         return tab
+    
+    def _on_style_changed(self, style_name: str) -> None:
+        """Handle style dropdown change - update prompt editor."""
+        from ..config.prompts import IMAGE_STYLE_PRESETS
+        
+        # Check for custom prompt first
+        custom_prompts = self._config_manager.config.image.custom_prompts
+        if style_name in custom_prompts:
+            self._prompt_edit.setText(custom_prompts[style_name])
+            self._prompt_edit.setStyleSheet("font-family: monospace; font-size: 11px; background-color: #fffae6;")
+        else:
+            # Use default prompt
+            default_prompt = IMAGE_STYLE_PRESETS.get(style_name, "")
+            self._prompt_edit.setText(default_prompt)
+            self._prompt_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+    
+    def _save_style_prompt(self) -> None:
+        """Save the current prompt as a custom prompt for the selected style."""
+        style_name = self._style_dropdown.currentText()
+        custom_prompt = self._prompt_edit.toPlainText().strip()
+        
+        if not custom_prompt:
+            showWarning("Prompt cannot be empty.")
+            return
+        
+        try:
+            # Save to config
+            self._config_manager.config.image.custom_prompts[style_name] = custom_prompt
+            self._config_manager.save()
+            
+            # Update UI to show it's a custom prompt
+            self._prompt_edit.setStyleSheet("font-family: monospace; font-size: 11px; background-color: #fffae6;")
+            showInfo(f"Custom prompt saved for '{style_name}' style.", title="Prompt Saved")
+            logger.info(f"Saved custom image prompt for style: {style_name}")
+        except Exception as e:
+            logger.error(f"Failed to save custom prompt: {e}")
+            showWarning(f"Failed to save prompt:\n{e}")
+    
+    def _reset_style_prompt(self) -> None:
+        """Reset the current style's prompt to default."""
+        from ..config.prompts import IMAGE_STYLE_PRESETS
+        
+        style_name = self._style_dropdown.currentText()
+        
+        # Remove custom prompt if exists
+        if style_name in self._config_manager.config.image.custom_prompts:
+            del self._config_manager.config.image.custom_prompts[style_name]
+            self._config_manager.save()
+        
+        # Load default prompt
+        default_prompt = IMAGE_STYLE_PRESETS.get(style_name, "")
+        self._prompt_edit.setText(default_prompt)
+        self._prompt_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+        showInfo(f"Prompt for '{style_name}' reset to default.", title="Prompt Reset")
     
     def _create_settings_tab(self) -> QWidget:
         """Create the settings tab."""
@@ -620,7 +709,10 @@ class DeckOperationDialog(QDialog):
     
     def _load_decks(self) -> None:
         """Load available decks into dropdown."""
+        logger.info("Loading decks into dropdown...")
+        
         if not mw or not mw.col:
+            logger.warning("mw or mw.col not available, cannot load decks")
             return
         
         deck_names = []
@@ -630,10 +722,14 @@ class DeckOperationDialog(QDialog):
             if card_ids:  # Only include decks with cards
                 deck_names.append(deck.name)
         
+        logger.info(f"Found {len(deck_names)} decks with cards")
+        
         if not deck_names:
             self._deck_dropdown.addItem("(No decks with cards)")
             return
         
+        # Block signals temporarily to prevent premature triggering
+        self._deck_dropdown.blockSignals(True)
         self._deck_dropdown.clear()
         self._deck_dropdown.addItems(deck_names)
         
@@ -641,10 +737,27 @@ class DeckOperationDialog(QDialog):
         saved_deck = self._config_manager.config.deck
         if saved_deck and saved_deck in deck_names:
             self._deck_dropdown.setCurrentText(saved_deck)
+        
+        self._deck_dropdown.blockSignals(False)
+        
+        # Explicitly trigger field loading for the initial deck selection
+        # This ensures field dropdowns are populated on dialog open
+        current_deck = self._deck_dropdown.currentText()
+        logger.info(f"Initial deck selection: '{current_deck}'")
+        
+        if current_deck and current_deck != "(No decks with cards)":
+            self._on_deck_changed(current_deck)
     
     def _on_deck_changed(self, deck_name: str) -> None:
         """Handle deck selection change."""
-        if not deck_name or not mw or not mw.col:
+        logger.info(f"_on_deck_changed called with deck: '{deck_name}'")
+        
+        if not deck_name:
+            logger.warning("deck_name is empty, returning")
+            return
+            
+        if not mw or not mw.col:
+            logger.warning("mw or mw.col not available")
             return
         
         self._current_deck = deck_name
@@ -652,10 +765,14 @@ class DeckOperationDialog(QDialog):
         # Get fields from first card in deck
         try:
             deck_id = mw.col.decks.id(deck_name)
+            logger.info(f"Deck ID: {deck_id}")
+            
             self._current_deck_id = deck_id  # Track for progress operations
             card_ids = mw.col.decks.cids(deck_id)
+            logger.info(f"Found {len(card_ids)} cards in deck")
             
             if not card_ids:
+                logger.warning("No cards found in deck, clearing dropdowns")
                 self._clear_field_dropdowns()
                 return
             
@@ -665,21 +782,25 @@ class DeckOperationDialog(QDialog):
             
             # Get field names
             fields = [field["name"] for field in model["flds"]]
+            logger.info(f"Found fields: {fields}")
+            
             self._current_fields = fields
             
             # Update all field dropdowns
             self._update_field_dropdowns(fields)
             
             # Show card count
-            unique_notes = len(set(mw.col.get_card(cid).nid for cid in card_ids))
+            unique_notes = len({mw.col.get_card(cid).nid for cid in card_ids})
             self._status_label.setText(f"Selected: {deck_name} ({unique_notes} notes)")
+            logger.info(f"Successfully loaded {len(fields)} fields for {unique_notes} notes")
             
         except Exception as e:
-            logger.error(f"Error loading deck fields: {e}")
+            logger.error(f"Error loading deck fields: {e}", exc_info=True)
             self._status_label.setText(f"Error: {e}")
     
     def _update_field_dropdowns(self, fields: List[str]) -> None:
         """Update all field dropdown menus."""
+        logger.info(f"Updating field dropdowns with {len(fields)} fields: {fields}")
         none_option = "(None)"
         
         # Translation tab
@@ -688,12 +809,18 @@ class DeckOperationDialog(QDialog):
                 dropdown.clear()
                 dropdown.addItems(fields)
                 dropdown.setEnabled(True)
+                logger.info(f"Enabled source/dest dropdown with {dropdown.count()} items")
+            else:
+                logger.warning("Translation source/dest dropdown is None!")
         
         if self._context_dropdown:
             self._context_dropdown.clear()
             self._context_dropdown.addItem(none_option)
             self._context_dropdown.addItems(fields)
             self._context_dropdown.setEnabled(True)
+            logger.info(f"Enabled context dropdown with {self._context_dropdown.count()} items")
+        else:
+            logger.warning("Context dropdown is None!")
         
         # Sentence tab
         for dropdown in [self._sentence_word_dropdown, self._sentence_field_dropdown, 
@@ -702,6 +829,8 @@ class DeckOperationDialog(QDialog):
                 dropdown.clear()
                 dropdown.addItems(fields)
                 dropdown.setEnabled(True)
+            else:
+                logger.warning("Sentence dropdown is None!")
         
         # Image tab
         for dropdown in [self._image_word_dropdown, self._image_field_dropdown]:
@@ -709,6 +838,10 @@ class DeckOperationDialog(QDialog):
                 dropdown.clear()
                 dropdown.addItems(fields)
                 dropdown.setEnabled(True)
+            else:
+                logger.warning("Image dropdown is None!")
+        
+        logger.info("Field dropdowns updated successfully")
         
         # Try to restore saved field selections
         self._restore_field_selections(fields)
@@ -718,25 +851,25 @@ class DeckOperationDialog(QDialog):
         config = self._config_manager.config
         
         # Translation fields
-        if config.translation.source_field in fields:
+        if self._source_dropdown and config.translation.source_field in fields:
             self._source_dropdown.setCurrentText(config.translation.source_field)
-        if config.translation.context_field in fields:
+        if self._context_dropdown and config.translation.context_field in fields:
             self._context_dropdown.setCurrentText(config.translation.context_field)
-        if config.translation.destination_field in fields:
+        if self._dest_dropdown and config.translation.destination_field in fields:
             self._dest_dropdown.setCurrentText(config.translation.destination_field)
         
         # Sentence fields
-        if config.sentence.expression_field in fields:
+        if self._sentence_word_dropdown and config.sentence.expression_field in fields:
             self._sentence_word_dropdown.setCurrentText(config.sentence.expression_field)
-        if config.sentence.sentence_field in fields:
+        if self._sentence_field_dropdown and config.sentence.sentence_field in fields:
             self._sentence_field_dropdown.setCurrentText(config.sentence.sentence_field)
-        if config.sentence.translation_field in fields:
+        if self._sentence_trans_dropdown and config.sentence.translation_field in fields:
             self._sentence_trans_dropdown.setCurrentText(config.sentence.translation_field)
         
         # Image fields
-        if config.image.word_field in fields:
+        if self._image_word_dropdown and config.image.word_field in fields:
             self._image_word_dropdown.setCurrentText(config.image.word_field)
-        if config.image.image_field in fields:
+        if self._image_field_dropdown and config.image.image_field in fields:
             self._image_field_dropdown.setCurrentText(config.image.image_field)
     
     def _clear_field_dropdowns(self) -> None:
@@ -1467,7 +1600,7 @@ class DeckOperationDialog(QDialog):
             from ..core.api_tester import test_api_connection
             
             # Get current model and language settings
-            model_name = self._config_manager.config.translation.model
+            model_name = self._config_manager.config.translation.model_name
             language = self._config_manager.config.translation.language
             
             success, message = test_api_connection(
