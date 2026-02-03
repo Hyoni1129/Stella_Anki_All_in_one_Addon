@@ -53,7 +53,9 @@ class StellaAnkiTools:
             return
         
         self._mw = mw
+        self._addon_dir = os.path.dirname(os.path.dirname(__file__))
         self._config_manager = ConfigManager()
+        self._config_manager.initialize(self._addon_dir)
         self._key_manager: Optional[APIKeyManager] = None
         
         # Feature modules (lazy-loaded)
@@ -90,7 +92,7 @@ class StellaAnkiTools:
     def key_manager(self) -> APIKeyManager:
         """Get API key manager (lazy-loaded)."""
         if self._key_manager is None:
-            self._key_manager = APIKeyManager()
+            self._key_manager = APIKeyManager(self._addon_dir)
         return self._key_manager
     
     # ========== Feature Access ==========
@@ -100,7 +102,7 @@ class StellaAnkiTools:
         """Get translator instance (lazy-loaded)."""
         if self._translator is None:
             from ..translation.translator import Translator
-            self._translator = Translator()
+            self._translator = Translator(self._addon_dir)
         return self._translator
     
     @property
@@ -108,7 +110,7 @@ class StellaAnkiTools:
         """Get sentence generator instance (lazy-loaded)."""
         if self._sentence_generator is None:
             from ..sentence.sentence_generator import SentenceGenerator
-            self._sentence_generator = SentenceGenerator()
+            self._sentence_generator = SentenceGenerator(self._addon_dir)
         return self._sentence_generator
     
     @property

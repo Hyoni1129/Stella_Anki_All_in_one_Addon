@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "Stella_Anki_All_in_one_Addon",
+			"path": ".."
+		},
+		{
+			"name": "Reference",
+			"path": "../../../../../../Documents/VSCode_Project/2. Stella_Anki_Tools/Reference"
+		}
+	],
+	"settings": {}
+}

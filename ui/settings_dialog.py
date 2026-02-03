@@ -11,6 +11,7 @@ Provides:
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, List, Dict, Any, Set
+import os
 import threading
 import time
 
@@ -67,10 +68,12 @@ class DeckOperationDialog(QDialog):
     def __init__(self, parent: 'AnkiQt'):
         super().__init__(parent)
         self._mw = parent
+        self._addon_dir = os.path.dirname(os.path.dirname(__file__))
         self._config_manager = ConfigManager()
-        self._key_manager = get_api_key_manager()
+        self._config_manager.initialize(self._addon_dir)
+        self._key_manager = get_api_key_manager(self._addon_dir)
         self._thread_pool = QThreadPool.globalInstance()
-        self._progress_manager = ProgressStateManager()
+        self._progress_manager = ProgressStateManager(self._addon_dir, operation="deck")
         
         # Current state
         self._current_deck = ""

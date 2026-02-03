@@ -45,6 +45,7 @@ if __name__ != "__main__":
             # Initialize configuration
             from .config.settings import ConfigManager
             config_manager = ConfigManager()
+            config_manager.initialize(addon_dir)
             
             # Initialize logger
             from .core.logger import get_logger
@@ -53,7 +54,7 @@ if __name__ != "__main__":
             
             # Initialize API key manager
             from .core.api_key_manager import APIKeyManager
-            key_manager = APIKeyManager()
+            key_manager = APIKeyManager(addon_dir)
             
             # Check for API keys
             if not key_manager.get_current_key():

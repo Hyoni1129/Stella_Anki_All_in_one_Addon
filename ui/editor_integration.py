@@ -51,7 +51,9 @@ class EditorIntegration:
         if hasattr(self, '_initialized') and self._initialized:
             return
         
+        self._addon_dir = os.path.dirname(os.path.dirname(__file__))
         self._config_manager = ConfigManager()
+        self._config_manager.initialize(self._addon_dir)
         self._hooks_registered = False
         self._initialized = True
         
@@ -407,7 +409,7 @@ class EditorIntegration:
         """Check if API key is configured."""
         try:
             from ..core.api_key_manager import APIKeyManager
-            manager = APIKeyManager()
+            manager = APIKeyManager(self._addon_dir)
             return manager.get_current_key() is not None
         except Exception:
             return False
