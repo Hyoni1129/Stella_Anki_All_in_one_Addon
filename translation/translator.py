@@ -203,27 +203,14 @@ class Translator:
         Returns:
             Translation text
         """
-        # Build prompt
+        # Build prompt with explicit JSON format request
         prompt = get_translation_prompt(word, context, target_language)
-        full_prompt = f"{TRANSLATION_SYSTEM_PROMPT}\n\n{prompt}"
+        # Add JSON format instruction to ensure structured response
+        json_instruction = "\n\nRespond with a JSON object containing: {\"translation\": \"<translation>\", \"notes\": \"<optional notes>\"}"
+        full_prompt = f"{TRANSLATION_SYSTEM_PROMPT}\n\n{prompt}{json_instruction}"
         
-        # Generation config for translation
+        # Generation config for translation (avoid unsupported response_mime_type for compatibility)
         generation_config = {
-            "response_mime_type": "application/json",
-            "response_schema": {
-                "type": "object",
-                "properties": {
-                    "translation": {
-                        "type": "string",
-                        "description": f"The {target_language} translation",
-                    },
-                    "notes": {
-                        "type": "string",
-                        "description": "Optional notes about the translation",
-                    },
-                },
-                "required": ["translation"],
-            },
             "temperature": 0.3,
             "max_output_tokens": 300,
         }

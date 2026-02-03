@@ -244,13 +244,14 @@ class GeminiClient:
             "max_output_tokens": 512,
         }
         
-        # Add response schema if provided
+        # Add JSON format instruction to prompt instead of using response_schema
+        # (response_mime_type/response_schema may not be supported in older SDK versions)
+        json_prompt = prompt
         if schema:
-            generation_config["response_mime_type"] = "application/json"
-            generation_config["response_schema"] = schema
+            json_prompt = f"{prompt}\n\nRespond with valid JSON only. No markdown formatting."
         
         response_text = self.generate_text(
-            prompt=prompt,
+            prompt=json_prompt,
             model_name=model_name,
             generation_config=generation_config,
             max_retries=max_retries,
