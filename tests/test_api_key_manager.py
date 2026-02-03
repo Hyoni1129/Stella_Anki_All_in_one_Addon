@@ -134,12 +134,12 @@ class TestAPIKeyManager(unittest.TestCase):
         manager = APIKeyManager(self.temp_dir)
         
         # Add valid key
-        success = manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
+        success, message = manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
         self.assertTrue(success)
         self.assertEqual(len(manager.get_all_keys()), 1)
         
         # Duplicate key should fail
-        success = manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
+        success, message = manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
         self.assertFalse(success)
     
     def test_key_validation(self):
@@ -147,13 +147,16 @@ class TestAPIKeyManager(unittest.TestCase):
         manager = APIKeyManager(self.temp_dir)
         
         # Too short
-        self.assertFalse(manager.add_key("short"))
+        success, message = manager.add_key("short")
+        self.assertFalse(success)
         
         # Wrong prefix
-        self.assertFalse(manager.add_key("NotAValidKey1234567890abcdefghijklmn"))
+        success, message = manager.add_key("NotAValidKey1234567890abcdefghijklmn")
+        self.assertFalse(success)
         
         # Valid
-        self.assertTrue(manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn"))
+        success, message = manager.add_key("AIzaSyTestKey1234567890abcdefghijklmn")
+        self.assertTrue(success)
     
     def test_remove_key(self):
         """Test removing API keys."""
