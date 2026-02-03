@@ -38,25 +38,42 @@ version is at least 1.4.0.
 """
 
 from google.auth.crypt import base
-from google.auth.crypt import es
-from google.auth.crypt import es256
-from google.auth.crypt import rsa
 
-EsSigner = es.EsSigner
-EsVerifier = es.EsVerifier
-ES256Signer = es256.ES256Signer
-ES256Verifier = es256.ES256Verifier
+# Make cryptography-dependent imports optional
+try:
+    from google.auth.crypt import es
+    from google.auth.crypt import es256
+    from google.auth.crypt import rsa
+    _HAS_CRYPTOGRAPHY = True
+except ImportError:
+    _HAS_CRYPTOGRAPHY = False
+    es = None
+    es256 = None
+    rsa = None
+
+if _HAS_CRYPTOGRAPHY:
+    EsSigner = es.EsSigner
+    EsVerifier = es.EsVerifier
+    ES256Signer = es256.ES256Signer
+    ES256Verifier = es256.ES256Verifier
+    RSASigner = rsa.RSASigner
+    RSAVerifier = rsa.RSAVerifier
+else:
+    EsSigner = None
+    EsVerifier = None
+    ES256Signer = None
+    ES256Verifier = None
+    RSASigner = None
+    RSAVerifier = None
 
 
 # Aliases to maintain the v1.0.0 interface, as the crypt module was split
 # into submodules.
 Signer = base.Signer
 Verifier = base.Verifier
-RSASigner = rsa.RSASigner
-RSAVerifier = rsa.RSAVerifier
 
 
-def verify_signature(message, signature, certs, verifier_cls=rsa.RSAVerifier):
+def verify_signature(message, signature, certs, verifier_cls=None):
     """Verify an RSA or ECDSA cryptographic signature.
 
     Checks that the provided ``signature`` was generated from ``bytes`` using
@@ -74,6 +91,11 @@ def verify_signature(message, signature, certs, verifier_cls=rsa.RSAVerifier):
     Returns:
         bool: True if the signature is valid, otherwise False.
     """
+    if not _HAS_CRYPTOGRAPHY:
+        raise ImportError("cryptography is required for signature verification")
+    
+    if verifier_cls is None:
+        verifier_cls = RSAVerifier
     if isinstance(certs, (str, bytes)):
         certs = [certs]
 

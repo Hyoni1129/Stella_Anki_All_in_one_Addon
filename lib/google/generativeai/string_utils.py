@@ -32,6 +32,8 @@ def set_doc(doc):
 
 
 def strip_oneof(docstring):
+    if docstring is None:
+        return ""
     lines = docstring.splitlines()
     lines = [line for line in lines if ".. _oneof:" not in line]
     lines = [line for line in lines if "This field is a member of `oneof`_" not in line]

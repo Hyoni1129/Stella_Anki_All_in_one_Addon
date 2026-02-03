@@ -6,28 +6,35 @@ This provides minimal stubs to satisfy imports when using google-generativeai
 with REST transport only (no actual gRPC functionality).
 """
 
-from enum import IntEnum
+from enum import Enum
+
+# Version info for compatibility
+__version__ = "1.0.0-stub"
 
 
-class StatusCode(IntEnum):
-    """gRPC status codes - stub for import compatibility."""
-    OK = 0
-    CANCELLED = 1
-    UNKNOWN = 2
-    INVALID_ARGUMENT = 3
-    DEADLINE_EXCEEDED = 4
-    NOT_FOUND = 5
-    ALREADY_EXISTS = 6
-    PERMISSION_DENIED = 7
-    RESOURCE_EXHAUSTED = 8
-    FAILED_PRECONDITION = 9
-    ABORTED = 10
-    OUT_OF_RANGE = 11
-    UNIMPLEMENTED = 12
-    INTERNAL = 13
-    UNAVAILABLE = 14
-    DATA_LOSS = 15
-    UNAUTHENTICATED = 16
+class StatusCode(Enum):
+    """gRPC status codes - stub for import compatibility.
+    
+    Values are tuples (int_code, description) matching real grpc.StatusCode format.
+    This allows code like `x.value[0]` to work correctly.
+    """
+    OK = (0, "ok")
+    CANCELLED = (1, "cancelled")
+    UNKNOWN = (2, "unknown")
+    INVALID_ARGUMENT = (3, "invalid argument")
+    DEADLINE_EXCEEDED = (4, "deadline exceeded")
+    NOT_FOUND = (5, "not found")
+    ALREADY_EXISTS = (6, "already exists")
+    PERMISSION_DENIED = (7, "permission denied")
+    RESOURCE_EXHAUSTED = (8, "resource exhausted")
+    FAILED_PRECONDITION = (9, "failed precondition")
+    ABORTED = (10, "aborted")
+    OUT_OF_RANGE = (11, "out of range")
+    UNIMPLEMENTED = (12, "unimplemented")
+    INTERNAL = (13, "internal")
+    UNAVAILABLE = (14, "unavailable")
+    DATA_LOSS = (15, "data loss")
+    UNAUTHENTICATED = (16, "unauthenticated")
 
 
 class RpcError(Exception):
@@ -70,11 +77,51 @@ class AuthMetadataContext:
     pass
 
 
-class Compression(IntEnum):
+class UnaryUnaryMultiCallable:
+    """Stub for grpc.UnaryUnaryMultiCallable"""
+    pass
+
+
+class UnaryStreamMultiCallable:
+    """Stub for grpc.UnaryStreamMultiCallable"""
+    pass
+
+
+class StreamUnaryMultiCallable:
+    """Stub for grpc.StreamUnaryMultiCallable"""
+    pass
+
+
+class StreamStreamMultiCallable:
+    """Stub for grpc.StreamStreamMultiCallable"""
+    pass
+
+
+class UnaryUnaryClientInterceptor:
+    """Stub for grpc.UnaryUnaryClientInterceptor"""
+    pass
+
+
+class UnaryStreamClientInterceptor:
+    """Stub for grpc.UnaryStreamClientInterceptor"""
+    pass
+
+
+class StreamUnaryClientInterceptor:
+    """Stub for grpc.StreamUnaryClientInterceptor"""
+    pass
+
+
+class StreamStreamClientInterceptor:
+    """Stub for grpc.StreamStreamClientInterceptor"""
+    pass
+
+
+class Compression(Enum):
     """Compression options - stub."""
-    NoCompression = 0
-    Deflate = 1
-    Gzip = 2
+    NoCompression = (0, "identity")
+    Deflate = (1, "deflate")
+    Gzip = (2, "gzip")
 
 
 # Stub functions
