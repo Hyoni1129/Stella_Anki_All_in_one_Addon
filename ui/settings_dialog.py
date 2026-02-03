@@ -77,6 +77,8 @@ class DeckOperationDialog(QDialog):
         
         # Current state
         self._current_deck = ""
+        self._current_deck_id: Optional[int] = None  # Track deck ID for progress operations
+        self._pending_deck_id: Optional[int] = None  # Track deck with pending operations to resume
         self._current_fields: List[str] = []
         self._active_worker = None
         self._cancel_event = threading.Event()
@@ -116,33 +118,46 @@ class DeckOperationDialog(QDialog):
     
     def _check_pending_operations(self) -> None:
         """Check for interrupted operations that can be resumed."""
-        if self._progress_manager.has_pending_run():
-            run_info = self._progress_manager.describe_run()
-            pending = self._progress_manager.get_pending_ids()
-            
-            if askUser(
-                f"Found interrupted operation:\n\n"
-                f"Type: {run_info.get('run_type', 'unknown')}\n"
-                f"Started: {run_info.get('started_at', 'unknown')}\n"
-                f"Pending items: {len(pending)}\n\n"
-                f"Would you like to resume?"
-            ):
-                self._resume_pending_operation()
-            else:
-                if askUser("Clear this interrupted operation?"):
-                    self._progress_manager.clear()
+        # Get all pending runs across all decks
+        all_runs = self._progress_manager.get_all_runs()
+        if not all_runs:
+            return
+        
+        # Find the first deck with pending operations
+        for deck_id, run_info in all_runs.items():
+            pending_count = run_info.get('pending_count', 0)
+            if pending_count > 0:
+                self._pending_deck_id = deck_id
+                
+                if askUser(
+                    f"Found interrupted operation:\n\n"
+                    f"Deck: {run_info.get('deck_name', 'unknown')}\n"
+                    f"Type: {run_info.get('operation', 'unknown')}\n"
+                    f"Started: {run_info.get('started_at', 'unknown')}\n"
+                    f"Pending items: {pending_count}\n\n"
+                    f"Would you like to resume?"
+                ):
+                    self._resume_pending_operation()
+                else:
+                    if askUser("Clear this interrupted operation?"):
+                        self._progress_manager.clear_run(deck_id)
+                break  # Handle one pending operation at a time
     
     def _resume_pending_operation(self) -> None:
         """Resume an interrupted operation."""
-        run_info = self._progress_manager.describe_run()
-        pending_ids = self._progress_manager.get_pending_ids()
+        if self._pending_deck_id is None:
+            showInfo("No pending operation found.")
+            return
         
-        if not pending_ids:
+        run_info = self._progress_manager.describe_run(self._pending_deck_id)
+        pending_ids = self._progress_manager.get_pending_note_ids(self._pending_deck_id)
+        
+        if not pending_ids or not run_info:
             showInfo("No pending items to process.")
             return
         
         # Get the stored run info
-        run_type = run_info.get("run_type", "")
+        run_type = run_info.get("operation", "")
         
         if run_type == "sentence":
             self._resume_sentence_batch(pending_ids, run_info)
@@ -521,7 +536,7 @@ class DeckOperationDialog(QDialog):
             "sketch", "minimalist", "cartoon", "pixel_art"
         ])
         self._style_dropdown.setCurrentText(
-            self._config_manager.config.image.default_style
+            self._config_manager.config.image.style_preset
         )
         style_row.addWidget(self._style_dropdown, 1)
         options_layout.addLayout(style_row)
@@ -623,7 +638,7 @@ class DeckOperationDialog(QDialog):
         self._deck_dropdown.addItems(deck_names)
         
         # Restore last selection
-        saved_deck = self._config_manager.config.translation.deck
+        saved_deck = self._config_manager.config.deck
         if saved_deck and saved_deck in deck_names:
             self._deck_dropdown.setCurrentText(saved_deck)
     
@@ -637,6 +652,7 @@ class DeckOperationDialog(QDialog):
         # Get fields from first card in deck
         try:
             deck_id = mw.col.decks.id(deck_name)
+            self._current_deck_id = deck_id  # Track for progress operations
             card_ids = mw.col.decks.cids(deck_id)
             
             if not card_ids:
@@ -718,10 +734,10 @@ class DeckOperationDialog(QDialog):
             self._sentence_trans_dropdown.setCurrentText(config.sentence.translation_field)
         
         # Image fields
-        if config.image.source_field in fields:
-            self._image_word_dropdown.setCurrentText(config.image.source_field)
-        if config.image.destination_field in fields:
-            self._image_field_dropdown.setCurrentText(config.image.destination_field)
+        if config.image.word_field in fields:
+            self._image_word_dropdown.setCurrentText(config.image.word_field)
+        if config.image.image_field in fields:
+            self._image_field_dropdown.setCurrentText(config.image.image_field)
     
     def _clear_field_dropdowns(self) -> None:
         """Clear and disable all field dropdowns."""
@@ -1076,18 +1092,12 @@ class DeckOperationDialog(QDialog):
         
         # Initialize progress state
         note_ids = [n["note_id"] for n in notes_data]
-        self._progress_manager.start_run(
-            run_type="sentence",
-            total_ids=note_ids,
-            extra_info={
-                "word_field": word_field,
-                "sentence_field": sentence_field,
-                "trans_field": trans_field,
-                "language": language,
-                "difficulty": difficulty,
-                "highlight": highlight,
-            }
-        )
+        if self._current_deck_id is not None:
+            self._progress_manager.start_run(
+                deck_id=self._current_deck_id,
+                deck_name=self._current_deck,
+                note_ids=note_ids
+            )
         
         for i, note_data in enumerate(notes_data):
             # Check cancel
@@ -1140,13 +1150,15 @@ class DeckOperationDialog(QDialog):
                 mw.col.update_note(note)
                 
                 success += 1
-                self._progress_manager.mark_success(note_id)
+                if self._current_deck_id is not None:
+                    self._progress_manager.mark_success(self._current_deck_id, note_id)
                 self._key_manager.record_success("sentence")
                 
             except Exception as e:
                 logger.error(f"Sentence generation failed for '{word}': {e}")
                 failure += 1
-                self._progress_manager.mark_failure(note_id, str(e))
+                if self._current_deck_id is not None:
+                    self._progress_manager.mark_failure(self._current_deck_id, note_id, str(e))
                 self._key_manager.record_failure(str(e))
             
             # Rate limiting
@@ -1158,8 +1170,8 @@ class DeckOperationDialog(QDialog):
         self._end_batch_ui()
         
         # Clear progress state if completed
-        if not self._cancel_event.is_set():
-            self._progress_manager.clear()
+        if not self._cancel_event.is_set() and self._current_deck_id is not None:
+            self._progress_manager.clear_run(self._current_deck_id)
         
         self._on_finished(success, failure)
     
@@ -1266,15 +1278,12 @@ class DeckOperationDialog(QDialog):
         
         # Initialize progress state
         note_ids = [n["note_id"] for n in notes_data]
-        self._progress_manager.start_run(
-            run_type="image",
-            total_ids=note_ids,
-            extra_info={
-                "word_field": word_field,
-                "image_field": image_field,
-                "style": style,
-            }
-        )
+        if self._current_deck_id is not None:
+            self._progress_manager.start_run(
+                deck_id=self._current_deck_id,
+                deck_name=self._current_deck,
+                note_ids=note_ids
+            )
         
         for i, note_data in enumerate(notes_data):
             # Check cancel
@@ -1326,22 +1335,26 @@ class DeckOperationDialog(QDialog):
                         note[image_field] = f'<img src="{media_result.filename}">'
                         mw.col.update_note(note)
                         success += 1
-                        self._progress_manager.mark_success(note_id)
+                        if self._current_deck_id is not None:
+                            self._progress_manager.mark_success(self._current_deck_id, note_id)
                         self._key_manager.record_success("image")
                     else:
                         failure += 1
-                        self._progress_manager.mark_failure(note_id, media_result.error or "Save failed")
+                        if self._current_deck_id is not None:
+                            self._progress_manager.mark_failure(self._current_deck_id, note_id, media_result.error or "Save failed")
                         logger.warning(f"Failed to save image: {media_result.error}")
                 else:
                     failure += 1
-                    self._progress_manager.mark_failure(note_id, result.error or "Generation failed")
+                    if self._current_deck_id is not None:
+                        self._progress_manager.mark_failure(self._current_deck_id, note_id, result.error or "Generation failed")
                     self._key_manager.record_failure(result.error or "unknown")
                     logger.warning(f"Image generation failed: {result.error}")
                     
             except Exception as e:
                 logger.error(f"Image generation failed for '{word}': {e}")
                 failure += 1
-                self._progress_manager.mark_failure(note_id, str(e))
+                if self._current_deck_id is not None:
+                    self._progress_manager.mark_failure(self._current_deck_id, note_id, str(e))
                 self._key_manager.record_failure(str(e))
             
             # Rate limiting (images need more time)
@@ -1353,8 +1366,8 @@ class DeckOperationDialog(QDialog):
         self._end_batch_ui()
         
         # Clear progress state if completed
-        if not self._cancel_event.is_set():
-            self._progress_manager.clear()
+        if not self._cancel_event.is_set() and self._current_deck_id is not None:
+            self._progress_manager.clear_run(self._current_deck_id)
         
         self._on_finished(success, failure)
     

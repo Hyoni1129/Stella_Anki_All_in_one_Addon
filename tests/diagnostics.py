@@ -134,7 +134,8 @@ class StellaDiagnostics:
         }
         
         if IN_ANKI:
-            env["anki_version"] = mw.app.version
+            from aqt import appVersion
+            env["anki_version"] = appVersion
             env["qt_version"] = "Qt6" # Simplified, can be more specific
             
         self.results["environment"] = env

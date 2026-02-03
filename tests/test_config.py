@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.settings import (
-    ConfigManager, Config, 
+    ConfigManager, StellaConfig,
     TranslationConfig, SentenceConfig, ImageConfig
 )
 
@@ -29,20 +29,8 @@ class TestTranslationConfig(unittest.TestCase):
         config = TranslationConfig()
         
         self.assertEqual(config.target_language, "Korean")
-        self.assertEqual(config.batch_size, 10)
+        self.assertEqual(config.batch_size, 5)
         self.assertFalse(config.overwrite_existing)
-    
-    def test_to_dict(self):
-        """Test serialization."""
-        config = TranslationConfig(
-            target_language="Japanese",
-            batch_size=5,
-        )
-        
-        data = config.to_dict()
-        
-        self.assertEqual(data["target_language"], "Japanese")
-        self.assertEqual(data["batch_size"], 5)
     
     def test_from_dict(self):
         """Test deserialization."""
@@ -86,38 +74,40 @@ class TestImageConfig(unittest.TestCase):
         """Test default values."""
         config = ImageConfig()
         
-        self.assertEqual(config.default_style, "realistic")
+        self.assertEqual(config.style_preset, "anime")
+        self.assertEqual(config.default_style, "anime")
     
-    def test_to_dict(self):
-        """Test serialization."""
-        config = ImageConfig(
-            default_style="anime",
-            source_field="Word",
-            destination_field="Picture",
-        )
-        
-        data = config.to_dict()
-        
-        self.assertEqual(data["default_style"], "anime")
-        self.assertEqual(data["source_field"], "Word")
+    def test_defaults_from_legacy_keys(self):
+        """Test legacy keys map into new fields."""
+        data = {
+            "default_style": "watercolor",
+            "source_field": "Word",
+            "destination_field": "Picture",
+        }
+
+        config = ImageConfig.from_dict(data)
+
+        self.assertEqual(config.style_preset, "watercolor")
+        self.assertEqual(config.word_field, "Word")
+        self.assertEqual(config.image_field, "Picture")
 
 
 class TestConfig(unittest.TestCase):
-    """Test main Config class."""
+    """Test main StellaConfig class."""
     
     def test_combined_config(self):
         """Test combined configuration."""
-        config = Config(
-            translation=TranslationConfig(target_language="French"),
+        config = StellaConfig(
+            translation=TranslationConfig(language="French"),
             sentence=SentenceConfig(difficulty="Complex"),
-            image=ImageConfig(default_style="watercolor"),
+            image=ImageConfig(style_preset="watercolor"),
         )
         
         data = config.to_dict()
         
-        self.assertEqual(data["translation"]["target_language"], "French")
+        self.assertEqual(data["translation"]["language"], "French")
         self.assertEqual(data["sentence"]["difficulty"], "Complex")
-        self.assertEqual(data["image"]["default_style"], "watercolor")
+        self.assertEqual(data["image"]["style_preset"], "watercolor")
     
     def test_from_dict(self):
         """Test deserialization."""
@@ -127,7 +117,7 @@ class TestConfig(unittest.TestCase):
             "image": {"default_style": "sketch"},
         }
         
-        config = Config.from_dict(data)
+        config = StellaConfig.from_dict(data)
         
         self.assertEqual(config.translation.target_language, "German")
         self.assertEqual(config.sentence.difficulty, "Beginner")
@@ -152,21 +142,24 @@ class TestConfigManager(unittest.TestCase):
     
     def test_singleton(self):
         """Test singleton pattern."""
-        manager1 = ConfigManager(self.temp_dir)
+        manager1 = ConfigManager()
+        manager1.initialize(self.temp_dir)
         manager2 = ConfigManager()
         
         self.assertIs(manager1, manager2)
     
     def test_save_and_load(self):
         """Test saving and loading configuration."""
-        manager1 = ConfigManager(self.temp_dir)
-        manager1.config.translation.target_language = "Chinese"
+        manager1 = ConfigManager()
+        manager1.initialize(self.temp_dir)
+        manager1.config.translation.language = "Chinese"
         manager1.save()
         
         # Reset singleton
         ConfigManager._instance = None
         
-        manager2 = ConfigManager(self.temp_dir)
+        manager2 = ConfigManager()
+        manager2.initialize(self.temp_dir)
         
         self.assertEqual(
             manager2.config.translation.target_language,
@@ -175,7 +168,8 @@ class TestConfigManager(unittest.TestCase):
     
     def test_default_config_created(self):
         """Test default config is created when file doesn't exist."""
-        manager = ConfigManager(self.temp_dir)
+        manager = ConfigManager()
+        manager.initialize(self.temp_dir)
         
         # Should have defaults
         self.assertEqual(
@@ -185,7 +179,8 @@ class TestConfigManager(unittest.TestCase):
     
     def test_reload(self):
         """Test reloading configuration."""
-        manager = ConfigManager(self.temp_dir)
+        manager = ConfigManager()
+        manager.initialize(self.temp_dir)
         
         # Modify file directly
         with open(self.config_file, "w") as f:

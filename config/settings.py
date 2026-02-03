@@ -82,14 +82,23 @@ class ImageConfig:
     max_height: int = 600
     batch_size: int = 5
     request_delay_seconds: float = 2.0
+
+    @property
+    def default_style(self) -> str:
+        """Backward-compatible alias for style_preset."""
+        return self.style_preset
+
+    @default_style.setter
+    def default_style(self, value: str) -> None:
+        self.style_preset = value
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ImageConfig":
         return cls(
             enabled=data.get("enabled", True),
-            word_field=data.get("word_field", "Word"),
-            image_field=data.get("image_field", "Image"),
-            style_preset=data.get("style_preset", "anime"),
+            word_field=data.get("word_field", data.get("source_field", "Word")),
+            image_field=data.get("image_field", data.get("destination_field", "Image")),
+            style_preset=data.get("style_preset", data.get("default_style", "anime")),
             max_width=data.get("max_width", 800),
             max_height=data.get("max_height", 600),
             batch_size=data.get("batch_size", 5),

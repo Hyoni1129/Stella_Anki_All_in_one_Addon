@@ -101,7 +101,7 @@ class ImagePromptGenerator:
                 )
             
             # Get style preset
-            style_name = style or self.config.default_style
+            style_name = style or self.config.style_preset
             style_config = IMAGE_STYLE_PRESETS.get(style_name, IMAGE_STYLE_PRESETS.get("cinematic", {}))
             
             # Build the prompt generation request
@@ -115,9 +115,8 @@ class ImagePromptGenerator:
             # Generate prompt using Gemini
             response = self.gemini_client.generate_json(
                 prompt=prompt_request,
-                model=self.config.prompt_model,
-                temperature=0.8,
-                response_schema={
+                model_name=self._config_manager.config.api.model,
+                schema={
                     "type": "object",
                     "properties": {
                         "image_prompt": {"type": "string"},
@@ -125,11 +124,11 @@ class ImagePromptGenerator:
                         "reasoning": {"type": "string"}
                     },
                     "required": ["image_prompt"]
-                }
+                },
             )
-            
-            if response.success and response.data:
-                image_prompt = response.data.get("image_prompt", "")
+
+            image_prompt = response.get("image_prompt", "") if isinstance(response, dict) else ""
+            if image_prompt:
                 
                 # Apply style modifiers if configured
                 if style_config.get("suffix"):
@@ -141,9 +140,8 @@ class ImagePromptGenerator:
                     style=style_name,
                     success=True,
                     metadata={
-                        "visual_elements": response.data.get("visual_elements", []),
-                        "reasoning": response.data.get("reasoning", ""),
-                        "tokens_used": response.tokens_used
+                        "reasoning": response.get("reasoning", ""),
+                        "visual_elements": response.get("visual_elements", [])
                     }
                 )
             else:
@@ -154,7 +152,7 @@ class ImagePromptGenerator:
                     prompt=fallback_prompt,
                     style=style_name,
                     success=True,
-                    metadata={"fallback": True, "error": response.error}
+                    metadata={"fallback": True, "error": "No image_prompt in response"}
                 )
                 
         except Exception as e:
@@ -166,7 +164,7 @@ class ImagePromptGenerator:
             return ImagePromptResult(
                 word=word,
                 prompt=fallback_prompt,
-                style=style or "default",
+                style=style or self.config.style_preset,
                 success=True,  # Fallback succeeded
                 error=f"{error_type}: {error_msg}",
                 metadata={"fallback": True}
@@ -225,7 +223,7 @@ class ImagePromptGenerator:
         if not clean_words:
             return results
         
-        style_name = style or self.config.default_style
+        style_name = style or self.config.style_preset
         style_config = IMAGE_STYLE_PRESETS.get(style_name, {})
         
         # Process in batches of 25
@@ -252,10 +250,8 @@ class ImagePromptGenerator:
             # Request JSON response with prompts for all words
             response = self.gemini_client.generate_json(
                 prompt=batch_prompt,
-                model=self.config.prompt_model,
-                temperature=0.7,
-                max_tokens=4096,
-                response_schema={
+                model_name=self._config_manager.config.api.model,
+                schema={
                     "type": "object",
                     "properties": {
                         "prompts": {
@@ -264,11 +260,11 @@ class ImagePromptGenerator:
                         }
                     },
                     "required": ["prompts"]
-                }
+                },
             )
-            
-            if response.success and response.data:
-                prompts_dict = response.data.get("prompts", {})
+
+            prompts_dict = response.get("prompts", {}) if isinstance(response, dict) else {}
+            if prompts_dict:
                 
                 for word in words:
                     if word in prompts_dict:
@@ -299,7 +295,7 @@ class ImagePromptGenerator:
                         prompt=self._generate_fallback_prompt(word, style_config),
                         style=style_config.get("name", "default"),
                         success=True,
-                        error=response.error,
+                            error="Missing prompt for word",
                         metadata={"fallback": True}
                     )
                     
@@ -437,26 +433,33 @@ Respond with JSON:
             
             response = self.gemini_client.generate_json(
                 prompt=refinement_request,
-                model=self.config.prompt_model,
-                temperature=0.7
+                model_name=self._config_manager.config.api.model,
+                schema={
+                    "type": "object",
+                    "properties": {
+                        "image_prompt": {"type": "string"},
+                        "changes": {"type": "string"}
+                    },
+                    "required": ["image_prompt"]
+                },
             )
             
-            if response.success and response.data:
+            if isinstance(response, dict) and response.get("image_prompt"):
                 return ImagePromptResult(
                     word=word,
-                    prompt=response.data.get("image_prompt", base_prompt),
+                    prompt=response.get("image_prompt", base_prompt),
                     style="refined",
                     success=True,
-                    metadata={"changes": response.data.get("changes", "")}
+                    metadata={"changes": response.get("changes", "")}
                 )
-            else:
-                return ImagePromptResult(
-                    word=word,
-                    prompt=base_prompt,
-                    style="original",
-                    success=False,
-                    error=response.error
-                )
+
+            return ImagePromptResult(
+                word=word,
+                prompt=base_prompt,
+                style="original",
+                success=False,
+                error="No image_prompt in response"
+            )
                 
         except Exception as e:
             logger.error(f"Prompt refinement failed: {e}")
