@@ -94,8 +94,12 @@ if __name__ != "__main__":
         except Exception:
             pass
         
-        print(f"Stella Anki Tools initialization failed: {e}")
-        print(error_details)
+        # Use stderr for initialization failures (logger may not be available)
+        import sys
+        sys.stderr.write(f"Stella Anki Tools initialization failed: {e}\n")
+        sys.stderr.write(f"{error_details}\n")
 
 else:
-    print("This file is an Anki add-on. Please run it within Anki.")
+    # Use stderr for direct execution warning
+    import sys
+    sys.stderr.write("This file is an Anki add-on. Please run it within Anki.\n")

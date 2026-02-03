@@ -141,7 +141,7 @@ def format_error_message(error: Exception, operation: str = "operation") -> str:
     Returns:
         User-friendly error message
     """
-    error_type, message = classify_error(error)
+    _, message = classify_error(error)  # SonarQube fix: S1481 - use _ for unused variable
     return f"Failed to {operation}: {message}"
 
 
@@ -253,8 +253,8 @@ def extract_json_from_response(text: str) -> Optional[str]:
     if not text:
         return None
     
-    # Try to find JSON in code blocks
-    json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    # Try to find JSON in code blocks (SonarQube fix: avoid reluctant quantifier)
+    json_match = re.search(r"```(?:json)?\s*(\{[^`]*\})\s*```", text, re.DOTALL)
     if json_match:
         return json_match.group(1)
     

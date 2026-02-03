@@ -9,6 +9,11 @@ Usage in Anki Debug Console:
     from Stella_Anki_All_in_one_Addon.core.debug_utils import debug_stella_status
     debug_stella_status()
 
+Note: This module intentionally uses print() instead of logger because:
+1. It's designed for Anki's Debug Console which expects print() output
+2. The logger may not be initialized when debugging initialization issues
+3. Output needs to be visible immediately in the console, not log files
+
 Adapted from Reference implementations.
 """
 

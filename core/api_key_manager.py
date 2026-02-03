@@ -17,13 +17,17 @@ from __future__ import annotations
 import os
 import json
 import re
-import time
 import base64
 import hashlib
 import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any, Callable
 from dataclasses import dataclass, field, asdict
+
+from .logger import get_logger
+
+# Module logger
+_logger = get_logger(__name__)
 
 # Constants
 MAX_API_KEYS = 15
@@ -274,7 +278,11 @@ class APIKeyManager:
                     data = json.load(f)
                     # Pass encryption key for decryption
                     self.state = APIKeyManagerState.from_dict(data, self._encryption_key)
-        except Exception:
+        except (json.JSONDecodeError, IOError, OSError) as e:
+            _logger.warning(f"Failed to load API key state, using defaults: {e}")
+            self.state = APIKeyManagerState()
+        except Exception as e:
+            _logger.error(f"Unexpected error loading API key state: {e}")
             self.state = APIKeyManagerState()
     
     def _save_state(self) -> None:
@@ -286,8 +294,10 @@ class APIKeyManager:
                     self.state.to_dict(encrypt=ENCRYPTION_ENABLED, encryption_key=self._encryption_key), 
                     f, indent=2, ensure_ascii=False
                 )
-        except Exception:
-            pass  # Silent fail - state save not critical
+        except (IOError, OSError) as e:
+            _logger.debug(f"Non-critical: Could not save API key state: {e}")
+        except Exception as e:
+            _logger.debug(f"Non-critical: Unexpected error saving API key state: {e}")
     
     def _load_stats(self) -> None:
         """Load statistics from persistent storage."""
@@ -295,16 +305,20 @@ class APIKeyManager:
             if os.path.exists(self._stats_file):
                 with open(self._stats_file, "r", encoding="utf-8") as f:
                     self.state.stats = json.load(f)
-        except Exception:
-            pass  # Silent fail - stats will reset
+        except (json.JSONDecodeError, IOError, OSError) as e:
+            _logger.debug(f"Non-critical: Could not load API stats, will reset: {e}")
+        except Exception as e:
+            _logger.debug(f"Non-critical: Unexpected error loading API stats: {e}")
     
     def _save_stats(self) -> None:
         """Save statistics to persistent storage."""
         try:
             with open(self._stats_file, "w", encoding="utf-8") as f:
                 json.dump(self.state.stats, f, indent=2, ensure_ascii=False)
-        except Exception:
-            pass  # Silent fail - stats save not critical
+        except (IOError, OSError) as e:
+            _logger.debug(f"Non-critical: Could not save API stats: {e}")
+        except Exception as e:
+            _logger.debug(f"Non-critical: Unexpected error saving API stats: {e}")
     
     def _ensure_stats_for_key(self, key: str) -> None:
         """Ensure statistics entry exists for a key."""
@@ -317,8 +331,8 @@ class APIKeyManager:
         for listener in self._listeners:
             try:
                 listener(event, data or {})
-            except Exception:
-                pass  # Silent fail for event listeners
+            except Exception as e:
+                _logger.debug(f"Non-critical: Event listener failed for '{event}': {e}")
     
     # ========== Listener Management ==========
     

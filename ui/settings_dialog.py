@@ -199,7 +199,6 @@ class DeckOperationDialog(QDialog):
         deck_group_layout = QHBoxLayout(deck_group)
         deck_group_layout.addWidget(QLabel("Deck:"))
         self._deck_dropdown = QComboBox()
-        self._deck_dropdown.currentTextChanged.connect(self._on_deck_changed)
         deck_group_layout.addWidget(self._deck_dropdown, 1)
         layout.addWidget(deck_group)
         
@@ -279,6 +278,9 @@ class DeckOperationDialog(QDialog):
         button_row.addStretch()
         button_row.addWidget(close_btn)
         layout.addLayout(button_row)
+        
+        # Connect deck change signal now that all tabs/widgets are created
+        self._deck_dropdown.currentTextChanged.connect(self._on_deck_changed)
     
     def _create_translation_tab(self) -> QWidget:
         """Create the translation tab."""

@@ -197,7 +197,22 @@ class EditorIntegration:
         note: 'Note',
         current_field_idx: int
     ) -> bool:
-        """Handle field unfocus for auto-generation."""
+        """
+        Handle field unfocus for auto-generation.
+        
+        Note: This method intentionally always returns `changed` as-is per Anki's
+        hook contract. The hook is used for side effects (auto-generation),
+        not to modify the changed state. This is correct behavior, not a bug.
+        (SonarQube S3516 - expected for pass-through hook pattern)
+        
+        Args:
+            changed: Whether the field content changed (passed through unchanged)
+            note: The current note being edited
+            current_field_idx: Index of the field that lost focus
+            
+        Returns:
+            The original `changed` value (required by Anki hook contract)
+        """
         try:
             # Check if auto-generation is enabled
             if not self.config.auto_generate:
