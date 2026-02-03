@@ -180,74 +180,86 @@ class ImageGenerator:
         self._stats["total_requests"] += 1
         
         if not self._ensure_client():
-            return ImageGenerationResult(
-                word=word,
-                prompt=prompt,
-                success=False,
-                error="Failed to initialize image generation client"
-            )
+            return self._create_failure_result(word, prompt, "Failed to initialize image generation client", 0, 0)
         
         last_error = None
         for attempt in range(self.max_retries):
-            try:
-                logger.info(f"Generating image for '{word}' (attempt {attempt + 1})")
-                
-                response = self._make_generation_request(prompt)
-                image_data = self._extract_image_data(response)
-                
-                if image_data:
-                    generation_time = time.time() - start_time
-                    self._stats["successful"] += 1
-                    self._stats["total_generation_time"] += generation_time
-                    
-                    # Record success with key manager
-                    self.key_manager.record_success(operation="image")
-                    
-                    # Get image dimensions if PIL is available
-                    width, height = self._get_image_dimensions(image_data)
-                    
-                    logger.info(f"Image generated for '{word}' in {generation_time:.1f}s")
-                    
-                    return ImageGenerationResult(
-                        word=word,
-                        prompt=prompt,
-                        success=True,
-                        image_data=image_data,
-                        width=width,
-                        height=height,
-                        generation_time=generation_time,
-                        retry_count=attempt
-                    )
-                else:
-                    raise ImageGenerationError("No image data in response")
-                    
-            except Exception as e:
-                last_error = e
-                error_type, error_msg = classify_error(e)
-                logger.warning(f"Image generation attempt {attempt + 1} failed: {error_type} - {error_msg}")
-                
-                # Record failure and let key manager handle rotation internally
-                if error_type in ("rate_limit", "quota_exceeded", "auth_error"):
-                    rotated, new_key_id = self.key_manager.record_failure(error_type)
-                    if rotated:
-                        logger.info(f"Rotated to next API key: {new_key_id}")
-                        self._reinitialize_with_new_key()
-                
-                if attempt < self.max_retries - 1:
-                    logger.info(f"Retrying in {self.retry_delay}s...")
-                    time.sleep(self.retry_delay)
+            result = self._attempt_image_generation(prompt, word, attempt, start_time)
+            if result.success:
+                return result
+            last_error = result.error
+            
+            if attempt < self.max_retries - 1:
+                logger.info(f"Retrying in {self.retry_delay}s...")
+                time.sleep(self.retry_delay)
         
-        # All attempts failed
-        self._stats["failed"] += 1
+        return self._finalize_failure(word, prompt, last_error, start_time)
+    
+    def _attempt_image_generation(
+        self, prompt: str, word: str, attempt: int, start_time: float
+    ) -> ImageGenerationResult:
+        """Single attempt at image generation."""
+        try:
+            logger.info(f"Generating image for '{word}' (attempt {attempt + 1})")
+            
+            response = self._make_generation_request(prompt)
+            image_data = self._extract_image_data(response)
+            
+            if not image_data:
+                raise ImageGenerationError("No image data in response")
+            
+            return self._create_success_result(word, prompt, image_data, attempt, start_time)
+            
+        except Exception as e:
+            self._handle_image_error(e)
+            return self._create_failure_result(word, prompt, str(e), attempt, time.time() - start_time)
+    
+    def _create_success_result(
+        self, word: str, prompt: str, image_data: bytes, attempt: int, start_time: float
+    ) -> ImageGenerationResult:
+        """Create a successful result."""
         generation_time = time.time() - start_time
+        self._stats["successful"] += 1
+        self._stats["total_generation_time"] += generation_time
+        self.key_manager.record_success(operation="image")
+        
+        width, height = self._get_image_dimensions(image_data)
+        logger.info(f"Image generated for '{word}' in {generation_time:.1f}s")
         
         return ImageGenerationResult(
-            word=word,
-            prompt=prompt,
-            success=False,
-            error=str(last_error),
-            generation_time=generation_time,
-            retry_count=self.max_retries
+            word=word, prompt=prompt, success=True, image_data=image_data,
+            width=width, height=height, generation_time=generation_time, retry_count=attempt
+        )
+    
+    def _create_failure_result(
+        self, word: str, prompt: str, error: str, attempt: int, generation_time: float
+    ) -> ImageGenerationResult:
+        """Create a failure result."""
+        return ImageGenerationResult(
+            word=word, prompt=prompt, success=False, error=error,
+            generation_time=generation_time, retry_count=attempt
+        )
+    
+    def _handle_image_error(self, error: Exception) -> None:
+        """Handle image generation error and potentially rotate keys."""
+        error_type, error_msg = classify_error(error)
+        logger.warning(f"Image generation failed: {error_type} - {error_msg}")
+        
+        if error_type in ("rate_limit", "quota_exceeded", "auth_error"):
+            rotated, new_key_id = self.key_manager.record_failure(error_type)
+            if rotated:
+                logger.info(f"Rotated to next API key: {new_key_id}")
+                self._reinitialize_with_new_key()
+    
+    def _finalize_failure(
+        self, word: str, prompt: str, last_error: Optional[str], start_time: float
+    ) -> ImageGenerationResult:
+        """Finalize after all attempts failed."""
+        self._stats["failed"] += 1
+        generation_time = time.time() - start_time
+        return ImageGenerationResult(
+            word=word, prompt=prompt, success=False, error=str(last_error),
+            generation_time=generation_time, retry_count=self.max_retries
         )
     
     def _make_generation_request(self, prompt: str) -> Any:

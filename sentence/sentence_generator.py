@@ -52,6 +52,28 @@ class SentenceGenerator:
         
         self._logger.info("SentenceGenerator initialized")
     
+    def _extract_word_from_note(self, note: Note, expression_field: str) -> str:
+        """Extract and validate word from note."""
+        word = strip_html(note[expression_field]) if expression_field in note else ""
+        if not word:
+            raise ValueError(f"Expression field '{expression_field}' is empty")
+        return word
+    
+    def _apply_sentence_highlighting(
+        self, sentence_data: Dict[str, str], word: str, highlight: bool
+    ) -> Tuple[str, str]:
+        """Apply optional highlighting to sentence and translation."""
+        sentence = sentence_data["translated_sentence"]
+        translation = sentence_data["english_sentence"]
+        
+        if highlight:
+            conjugated = sentence_data.get("translated_conjugated_word", word)
+            english_word = sentence_data.get("english_word", word)
+            sentence = self._apply_highlight(sentence, conjugated)
+            translation = self._apply_highlight(translation, english_word)
+        
+        return sentence, translation
+    
     def generate_sentence_async(
         self,
         parent_widget,
@@ -83,80 +105,66 @@ class SentenceGenerator:
             error_callback: Called on failure
         """
         
-        def background_operation(col: Collection) -> Tuple[str, str]:
+        def background_operation(_col: Collection) -> Tuple[str, str]:
             """Background task: generate sentence."""
-            # Get API key
-            api_key = self._key_manager.get_current_key()
-            if not api_key:
+            if not self._key_manager.get_current_key():
                 raise GeminiError("No API key available")
             
-            # Extract target word
-            word = strip_html(note[expression_field]) if expression_field in note else ""
-            if not word:
-                raise ValueError(f"Expression field '{expression_field}' is empty")
-            
+            word = self._extract_word_from_note(note, expression_field)
             self._logger.info(f"Generating sentence for '{word}' ({target_language})")
             
-            # Generate sentence
             sentence_data = self._generate_sentence(
-                word=word,
-                target_language=target_language,
-                difficulty=difficulty,
-                model_name=model_name,
+                word=word, target_language=target_language,
+                difficulty=difficulty, model_name=model_name
             )
             
-            # Apply highlighting if enabled
-            sentence = sentence_data["translated_sentence"]
-            translation = sentence_data["english_sentence"]
-            
-            if highlight:
-                conjugated = sentence_data.get("translated_conjugated_word", word)
-                english_word = sentence_data.get("english_word", word)
-                
-                sentence = self._apply_highlight(sentence, conjugated)
-                translation = self._apply_highlight(translation, english_word)
-            
-            self._logger.info(f"Sentence generated: {sentence[:50]}...")
-            return sentence, translation
+            result = self._apply_sentence_highlighting(sentence_data, word, highlight)
+            self._logger.info(f"Sentence generated: {result[0][:50]}...")
+            return result
         
         def on_success(result: Tuple[str, str]) -> None:
             """Success callback on main thread."""
-            try:
-                sentence, translation = result
-                
-                note[sentence_field] = sentence
-                note[translation_field] = translation
-                mw.col.update_note(note)
-                
-                self._logger.info("Note updated with sentence")
-                
-                if success_callback:
-                    success_callback()
-                    
-            except Exception as e:
-                error_msg = f"Failed to update note: {e}"
-                self._logger.error(error_msg)
-                if error_callback:
-                    error_callback(error_msg)
+            self._update_note_with_sentence(
+                note, sentence_field, translation_field, result, success_callback, error_callback
+            )
         
         def on_failure(error: Exception) -> None:
             """Failure callback on main thread."""
-            error_msg = self._format_error_message(str(error))
-            self._logger.error(f"Sentence generation failed: {error_msg}")
-            
+            self._handle_sentence_failure(error, error_callback)
+        
+        op = QueryOp(parent=parent_widget, op=background_operation, success=on_success)
+        op.failure(on_failure).with_progress("Generating sentence...").run_in_background()
+    
+    def _update_note_with_sentence(
+        self, note: Note, sentence_field: str, translation_field: str,
+        result: Tuple[str, str], success_callback: Optional[Callable[[], None]],
+        error_callback: Optional[Callable[[str], None]]
+    ) -> None:
+        """Update note with generated sentence."""
+        try:
+            sentence, translation = result
+            note[sentence_field] = sentence
+            note[translation_field] = translation
+            mw.col.update_note(note)
+            self._logger.info("Note updated with sentence")
+            if success_callback:
+                success_callback()
+        except Exception as e:
+            error_msg = f"Failed to update note: {e}"
+            self._logger.error(error_msg)
             if error_callback:
                 error_callback(error_msg)
-            else:
-                showWarning(f"Sentence generation failed:\n{error_msg}")
-        
-        # Execute with QueryOp
-        op = QueryOp(
-            parent=parent_widget,
-            op=background_operation,
-            success=on_success,
-        ).failure(on_failure)
-        
-        op.with_progress("Generating sentence...").run_in_background()
+    
+    def _handle_sentence_failure(
+        self, error: Exception, error_callback: Optional[Callable[[str], None]]
+    ) -> None:
+        """Handle sentence generation failure."""
+        error_msg = self._format_error_message(str(error))
+        self._logger.error(f"Sentence generation failed: {error_msg}")
+        if error_callback:
+            error_callback(error_msg)
+        else:
+            showWarning(f"Sentence generation failed:\n{error_msg}")
     
     def generate_sentence_sync(
         self,
@@ -285,7 +293,7 @@ Now generate for the word "{word}" in {target_language}:'''
         
         # Remove code fences
         if cleaned.startswith("```"):
-            cleaned = re.sub(r"^```[a-zA-Z0-9_]*", "", cleaned)
+            cleaned = re.sub(r"^```\w*", "", cleaned)
             cleaned = cleaned.strip("`")
         
         # Extract JSON object
@@ -339,7 +347,7 @@ Now generate for the word "{word}" in {target_language}:'''
             # Extract key-value pairs as fallback
             kv_pairs = re.findall(r'"([^"\\]+)"\s*:\s*"([^"\\]*)"', candidate)
             if kv_pairs:
-                return {k: v for k, v in kv_pairs}
+                return dict(kv_pairs)
             return None
     
     def _apply_highlight(self, text: str, word: str) -> str:

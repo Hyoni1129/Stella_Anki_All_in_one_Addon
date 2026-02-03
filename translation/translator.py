@@ -51,6 +51,19 @@ class Translator:
         
         self._logger.info("Translator initialized")
     
+    def _extract_word_and_context(
+        self, note: Note, source_field: str, context_field: str
+    ) -> tuple[str, str]:
+        """Extract word and context from note fields."""
+        word = strip_html(note[source_field]) if source_field in note else ""
+        if not word:
+            raise ValueError(f"Source field '{source_field}' is empty")
+        
+        context = ""
+        if context_field and context_field in note:
+            context = strip_html(note[context_field])
+        return word, context
+    
     def translate_note_async(
         self,
         parent_widget,
@@ -78,76 +91,70 @@ class Translator:
             error_callback: Called on failure with error message
         """
         
-        def background_operation(col: Collection) -> str:
+        def background_operation(_col: Collection) -> str:
             """Background task: generate translation."""
-            # Get API key
-            api_key = self._key_manager.get_current_key()
-            if not api_key:
+            if not self._key_manager.get_current_key():
                 raise GeminiError("No API key available. Please add an API key in settings.")
             
-            # Extract word and context
-            word = strip_html(note[source_field]) if source_field in note else ""
-            if not word:
-                raise ValueError(f"Source field '{source_field}' is empty")
-            
-            context = ""
-            if context_field and context_field in note:
-                context = strip_html(note[context_field])
-            
+            word, context = self._extract_word_and_context(note, source_field, context_field)
             self._logger.info(f"Translating '{word}' to {target_language}")
             
-            # Generate translation
             translation = self._generate_translation(
-                word=word,
-                context=context,
-                target_language=target_language,
-                model_name=model_name,
+                word=word, context=context, target_language=target_language, model_name=model_name
             )
-            
             self._logger.info(f"Translation complete: {translation}")
             return translation
         
         def on_success(translation: str) -> None:
             """Success callback on main thread."""
-            try:
-                note[destination_field] = translation
-                mw.col.update_note(note)
-                self._logger.info("Note updated successfully")
-                
-                if success_callback:
-                    success_callback()
-                    
-            except Exception as e:
-                error_msg = f"Failed to update note: {e}"
-                self._logger.error(error_msg)
-                if error_callback:
-                    error_callback(error_msg)
+            self._update_note_with_translation(
+                note, destination_field, translation, success_callback, error_callback
+            )
         
         def on_failure(error: Exception) -> None:
             """Failure callback on main thread."""
-            error_msg = self._format_error_message(str(error))
-            self._logger.error(f"Translation failed: {error_msg}")
-            
+            self._handle_translation_failure(error, error_callback)
+        
+        op = QueryOp(parent=parent_widget, op=background_operation, success=on_success)
+        op.failure(on_failure).with_progress("Generating translation...").run_in_background()
+    
+    def _update_note_with_translation(
+        self,
+        note: Note,
+        destination_field: str,
+        translation: str,
+        success_callback: Optional[Callable[[], None]],
+        error_callback: Optional[Callable[[str], None]],
+    ) -> None:
+        """Update note with translation result."""
+        try:
+            note[destination_field] = translation
+            mw.col.update_note(note)
+            self._logger.info("Note updated successfully")
+            if success_callback:
+                success_callback()
+        except Exception as e:
+            error_msg = f"Failed to update note: {e}"
+            self._logger.error(error_msg)
             if error_callback:
                 error_callback(error_msg)
-            else:
-                showWarning(f"Translation failed:\n{error_msg}")
-        
-        # Execute with QueryOp
-        op = QueryOp(
-            parent=parent_widget,
-            op=background_operation,
-            success=on_success,
-        ).failure(on_failure)
-        
-        op.with_progress("Generating translation...").run_in_background()
+    
+    def _handle_translation_failure(
+        self, error: Exception, error_callback: Optional[Callable[[str], None]]
+    ) -> None:
+        """Handle translation failure."""
+        error_msg = self._format_error_message(str(error))
+        self._logger.error(f"Translation failed: {error_msg}")
+        if error_callback:
+            error_callback(error_msg)
+        else:
+            showWarning(f"Translation failed:\n{error_msg}")
     
     def translate_note_sync(
         self,
         note: Note,
         source_field: str,
         context_field: str,
-        destination_field: str,
         target_language: str,
         model_name: str = "gemini-2.5-flash",
     ) -> str:
@@ -160,7 +167,6 @@ class Translator:
             note: Anki note to translate
             source_field: Field containing the word
             context_field: Field containing context
-            destination_field: Field to store translation
             target_language: Target language
             model_name: Gemini model to use
             
@@ -292,7 +298,7 @@ class Translator:
             raise ValueError(f"Invalid JSON response: {cleaned[:100]}...")
         
         if "translation" not in data:
-            raise ValueError(f"Missing 'translation' field in response")
+            raise ValueError("Missing 'translation' field in response")
         
         return data
     

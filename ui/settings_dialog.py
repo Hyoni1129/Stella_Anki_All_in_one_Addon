@@ -35,6 +35,20 @@ from ..sentence.progress_state import ProgressStateManager
 
 logger = get_logger(__name__)
 
+# UI Style Constants
+STYLE_HEADER = "font-weight: bold; font-size: 14px;"
+STYLE_PRIMARY_BTN = "font-weight: bold; padding: 8px;"
+STYLE_STOP_BTN = "background-color: #ff6b6b; color: white;"
+STYLE_PAUSE_BTN = "background-color: #ffc107; color: black;"
+STYLE_PROMPT_EDIT = "font-family: monospace; font-size: 11px;"
+STYLE_PROMPT_EDIT_CUSTOM = "font-family: monospace; font-size: 11px; background-color: #fffae6;"
+
+# UI Text Constants
+TEXT_PAUSE = "⏸ Pause"
+TEXT_STOP = "⏹ Stop"
+TEXT_FIELD_MAPPING = "Field Mapping"
+TEXT_NONE_OPTION = "(None)"
+
 
 def format_eta(seconds: float) -> str:
     """Format seconds to human readable ETA string."""
@@ -233,8 +247,8 @@ class DeckOperationDialog(QDialog):
         
         # Control buttons row
         control_row = QHBoxLayout()
-        self._pause_btn = QPushButton("⏸ Pause")
-        self._pause_btn.setStyleSheet("background-color: #ffc107; color: black;")
+        self._pause_btn = QPushButton(TEXT_PAUSE)
+        self._pause_btn.setStyleSheet(STYLE_PAUSE_BTN)
         self._pause_btn.setEnabled(False)
         self._pause_btn.clicked.connect(self._toggle_pause)
         control_row.addWidget(self._pause_btn)
@@ -273,11 +287,11 @@ class DeckOperationDialog(QDialog):
         
         # Header
         header = QLabel("Batch Translation")
-        header.setStyleSheet("font-weight: bold; font-size: 14px;")
+        header.setStyleSheet(STYLE_HEADER)
         layout.addWidget(header)
         
         # Field mappings
-        fields_group = QGroupBox("Field Mapping")
+        fields_group = QGroupBox(TEXT_FIELD_MAPPING)
         fields_layout = QVBoxLayout(fields_group)
         
         # Source field
@@ -374,12 +388,12 @@ class DeckOperationDialog(QDialog):
         button_row = QHBoxLayout()
         
         self._translate_btn = QPushButton("▶ Start Translation")
-        self._translate_btn.setStyleSheet("font-weight: bold; padding: 8px;")
+        self._translate_btn.setStyleSheet(STYLE_PRIMARY_BTN)
         self._translate_btn.clicked.connect(self._start_translation)
         button_row.addWidget(self._translate_btn)
         
-        self._stop_btn = QPushButton("⏹ Stop")
-        self._stop_btn.setStyleSheet("background-color: #ff6b6b; color: white;")
+        self._stop_btn = QPushButton(TEXT_STOP)
+        self._stop_btn.setStyleSheet(STYLE_STOP_BTN)
         self._stop_btn.setEnabled(False)
         self._stop_btn.clicked.connect(self._stop_operation)
         button_row.addWidget(self._stop_btn)
@@ -395,7 +409,7 @@ class DeckOperationDialog(QDialog):
         layout = QVBoxLayout(tab)
         
         header = QLabel("Batch Sentence Generation")
-        header.setStyleSheet("font-weight: bold; font-size: 14px;")
+        header.setStyleSheet(STYLE_HEADER)
         layout.addWidget(header)
         
         info = QLabel("Generates example sentences for vocabulary cards.")
@@ -403,7 +417,7 @@ class DeckOperationDialog(QDialog):
         layout.addWidget(info)
         
         # Field mappings
-        fields_group = QGroupBox("Field Mapping")
+        fields_group = QGroupBox(TEXT_FIELD_MAPPING)
         fields_layout = QVBoxLayout(fields_group)
         
         # Expression field (word)
@@ -478,12 +492,12 @@ class DeckOperationDialog(QDialog):
         button_row = QHBoxLayout()
         
         self._sentence_btn = QPushButton("▶ Generate Sentences")
-        self._sentence_btn.setStyleSheet("font-weight: bold; padding: 8px;")
+        self._sentence_btn.setStyleSheet(STYLE_PRIMARY_BTN)
         self._sentence_btn.clicked.connect(self._start_sentence_generation)
         button_row.addWidget(self._sentence_btn)
         
-        self._stop_sentence_btn = QPushButton("⏹ Stop")
-        self._stop_sentence_btn.setStyleSheet("background-color: #ff6b6b; color: white;")
+        self._stop_sentence_btn = QPushButton(TEXT_STOP)
+        self._stop_sentence_btn.setStyleSheet(STYLE_STOP_BTN)
         self._stop_sentence_btn.setEnabled(False)
         self._stop_sentence_btn.clicked.connect(self._stop_operation)
         button_row.addWidget(self._stop_sentence_btn)
@@ -499,7 +513,7 @@ class DeckOperationDialog(QDialog):
         layout = QVBoxLayout(tab)
         
         header = QLabel("Batch Image Generation")
-        header.setStyleSheet("font-weight: bold; font-size: 14px;")
+        header.setStyleSheet(STYLE_HEADER)
         layout.addWidget(header)
         
         info = QLabel("Generates images for vocabulary cards using Gemini Imagen.")
@@ -507,7 +521,7 @@ class DeckOperationDialog(QDialog):
         layout.addWidget(info)
         
         # Field mappings
-        fields_group = QGroupBox("Field Mapping")
+        fields_group = QGroupBox(TEXT_FIELD_MAPPING)
         fields_layout = QVBoxLayout(fields_group)
         
         # Word field
@@ -555,7 +569,7 @@ class DeckOperationDialog(QDialog):
         self._prompt_edit = QTextEdit()
         self._prompt_edit.setPlaceholderText("Select a style to view/edit its prompt...")
         self._prompt_edit.setMaximumHeight(120)
-        self._prompt_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+        self._prompt_edit.setStyleSheet(STYLE_PROMPT_EDIT)
         options_layout.addWidget(self._prompt_edit)
         
         # Prompt action buttons
@@ -587,12 +601,12 @@ class DeckOperationDialog(QDialog):
         button_row = QHBoxLayout()
         
         self._image_btn = QPushButton("▶ Generate Images")
-        self._image_btn.setStyleSheet("font-weight: bold; padding: 8px;")
+        self._image_btn.setStyleSheet(STYLE_PRIMARY_BTN)
         self._image_btn.clicked.connect(self._start_image_generation)
         button_row.addWidget(self._image_btn)
         
-        self._stop_image_btn = QPushButton("⏹ Stop")
-        self._stop_image_btn.setStyleSheet("background-color: #ff6b6b; color: white;")
+        self._stop_image_btn = QPushButton(TEXT_STOP)
+        self._stop_image_btn.setStyleSheet(STYLE_STOP_BTN)
         self._stop_image_btn.setEnabled(False)
         self._stop_image_btn.clicked.connect(self._stop_operation)
         button_row.addWidget(self._stop_image_btn)
@@ -610,12 +624,12 @@ class DeckOperationDialog(QDialog):
         custom_prompts = self._config_manager.config.image.custom_prompts
         if style_name in custom_prompts:
             self._prompt_edit.setText(custom_prompts[style_name])
-            self._prompt_edit.setStyleSheet("font-family: monospace; font-size: 11px; background-color: #fffae6;")
+            self._prompt_edit.setStyleSheet(STYLE_PROMPT_EDIT_CUSTOM)
         else:
             # Use default prompt
             default_prompt = IMAGE_STYLE_PRESETS.get(style_name, "")
             self._prompt_edit.setText(default_prompt)
-            self._prompt_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+            self._prompt_edit.setStyleSheet(STYLE_PROMPT_EDIT)
     
     def _save_style_prompt(self) -> None:
         """Save the current prompt as a custom prompt for the selected style."""
@@ -632,7 +646,7 @@ class DeckOperationDialog(QDialog):
             self._config_manager.save()
             
             # Update UI to show it's a custom prompt
-            self._prompt_edit.setStyleSheet("font-family: monospace; font-size: 11px; background-color: #fffae6;")
+            self._prompt_edit.setStyleSheet(STYLE_PROMPT_EDIT_CUSTOM)
             showInfo(f"Custom prompt saved for '{style_name}' style.", title="Prompt Saved")
             logger.info(f"Saved custom image prompt for style: {style_name}")
         except Exception as e:
@@ -653,7 +667,7 @@ class DeckOperationDialog(QDialog):
         # Load default prompt
         default_prompt = IMAGE_STYLE_PRESETS.get(style_name, "")
         self._prompt_edit.setText(default_prompt)
-        self._prompt_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+        self._prompt_edit.setStyleSheet(STYLE_PROMPT_EDIT)
         showInfo(f"Prompt for '{style_name}' reset to default.", title="Prompt Reset")
     
     def _create_settings_tab(self) -> QWidget:
@@ -662,7 +676,7 @@ class DeckOperationDialog(QDialog):
         layout = QVBoxLayout(tab)
         
         header = QLabel("Settings")
-        header.setStyleSheet("font-weight: bold; font-size: 14px;")
+        header.setStyleSheet(STYLE_HEADER)
         layout.addWidget(header)
         
         # API Key section
@@ -801,7 +815,6 @@ class DeckOperationDialog(QDialog):
     def _update_field_dropdowns(self, fields: List[str]) -> None:
         """Update all field dropdown menus."""
         logger.info(f"Updating field dropdowns with {len(fields)} fields: {fields}")
-        none_option = "(None)"
         
         # Translation tab
         for dropdown in [self._source_dropdown, self._dest_dropdown]:
@@ -815,7 +828,7 @@ class DeckOperationDialog(QDialog):
         
         if self._context_dropdown:
             self._context_dropdown.clear()
-            self._context_dropdown.addItem(none_option)
+            self._context_dropdown.addItem(TEXT_NONE_OPTION)
             self._context_dropdown.addItems(fields)
             self._context_dropdown.setEnabled(True)
             logger.info(f"Enabled context dropdown with {self._context_dropdown.count()} items")
@@ -850,27 +863,32 @@ class DeckOperationDialog(QDialog):
         """Restore previously saved field selections."""
         config = self._config_manager.config
         
-        # Translation fields
-        if self._source_dropdown and config.translation.source_field in fields:
-            self._source_dropdown.setCurrentText(config.translation.source_field)
-        if self._context_dropdown and config.translation.context_field in fields:
-            self._context_dropdown.setCurrentText(config.translation.context_field)
-        if self._dest_dropdown and config.translation.destination_field in fields:
-            self._dest_dropdown.setCurrentText(config.translation.destination_field)
+        # Define dropdown-to-field mappings for each category
+        translation_mappings = [
+            (self._source_dropdown, config.translation.source_field),
+            (self._context_dropdown, config.translation.context_field),
+            (self._dest_dropdown, config.translation.destination_field),
+        ]
+        sentence_mappings = [
+            (self._sentence_word_dropdown, config.sentence.expression_field),
+            (self._sentence_field_dropdown, config.sentence.sentence_field),
+            (self._sentence_trans_dropdown, config.sentence.translation_field),
+        ]
+        image_mappings = [
+            (self._image_word_dropdown, config.image.word_field),
+            (self._image_field_dropdown, config.image.image_field),
+        ]
         
-        # Sentence fields
-        if self._sentence_word_dropdown and config.sentence.expression_field in fields:
-            self._sentence_word_dropdown.setCurrentText(config.sentence.expression_field)
-        if self._sentence_field_dropdown and config.sentence.sentence_field in fields:
-            self._sentence_field_dropdown.setCurrentText(config.sentence.sentence_field)
-        if self._sentence_trans_dropdown and config.sentence.translation_field in fields:
-            self._sentence_trans_dropdown.setCurrentText(config.sentence.translation_field)
-        
-        # Image fields
-        if self._image_word_dropdown and config.image.word_field in fields:
-            self._image_word_dropdown.setCurrentText(config.image.word_field)
-        if self._image_field_dropdown and config.image.image_field in fields:
-            self._image_field_dropdown.setCurrentText(config.image.image_field)
+        # Apply all mappings
+        for dropdown, field_value in translation_mappings + sentence_mappings + image_mappings:
+            self._restore_dropdown_selection(dropdown, field_value, fields)
+    
+    def _restore_dropdown_selection(
+        self, dropdown: Optional[QComboBox], field_value: str, fields: List[str]
+    ) -> None:
+        """Restore a single dropdown selection if valid."""
+        if dropdown and field_value in fields:
+            dropdown.setCurrentText(field_value)
     
     def _clear_field_dropdowns(self) -> None:
         """Clear and disable all field dropdowns."""
@@ -912,43 +930,59 @@ class DeckOperationDialog(QDialog):
             seen_notes: Set[int] = set()
             
             for card_id in card_ids:
-                card = mw.col.get_card(card_id)
-                note = card.note()
-                
-                if note.id in seen_notes:
-                    continue
-                seen_notes.add(note.id)
-                
-                # Check if should skip
-                if skip_if_has_content_in and skip_if_has_content_in in note:
-                    content = note[skip_if_has_content_in].strip()
-                    if content and not content.startswith("<!--"):
-                        continue
-                
-                # Get word
-                if source_field not in note:
-                    continue
-                word = self._strip_html(note[source_field])
-                if not word:
-                    continue
-                
-                # Get context
-                context = ""
-                if context_field and context_field != "(None)" and context_field in note:
-                    context = self._strip_html(note[context_field])
-                
-                notes_data.append({
-                    "note": note,
-                    "note_id": note.id,
-                    "word": word,
-                    "context": context,
-                })
+                note_data = self._process_card_for_collection(
+                    card_id, seen_notes, source_field, context_field, skip_if_has_content_in
+                )
+                if note_data:
+                    notes_data.append(note_data)
             
             return notes_data
             
         except Exception as e:
             logger.error(f"Error collecting notes: {e}")
             return []
+    
+    def _process_card_for_collection(
+        self, card_id: int, seen_notes: Set[int], source_field: str,
+        context_field: Optional[str], skip_if_has_content_in: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
+        """Process a single card and return note data if valid."""
+        card = mw.col.get_card(card_id)
+        note = card.note()
+        
+        if note.id in seen_notes:
+            return None
+        seen_notes.add(note.id)
+        
+        if self._should_skip_note(note, skip_if_has_content_in):
+            return None
+        
+        word = self._extract_word_from_note(note, source_field)
+        if not word:
+            return None
+        
+        context = self._extract_context_from_note(note, context_field)
+        
+        return {"note": note, "note_id": note.id, "word": word, "context": context}
+    
+    def _should_skip_note(self, note, skip_field: Optional[str]) -> bool:
+        """Check if note should be skipped based on existing content."""
+        if not skip_field or skip_field not in note:
+            return False
+        content = note[skip_field].strip()
+        return bool(content and not content.startswith("<!--"))
+    
+    def _extract_word_from_note(self, note, source_field: str) -> str:
+        """Extract word from note's source field."""
+        if source_field not in note:
+            return ""
+        return self._strip_html(note[source_field])
+    
+    def _extract_context_from_note(self, note, context_field: Optional[str]) -> str:
+        """Extract context from note if field is valid."""
+        if not context_field or context_field == TEXT_NONE_OPTION or context_field not in note:
+            return ""
+        return self._strip_html(note[context_field])
     
     def _strip_html(self, text: str) -> str:
         """Remove HTML tags from text."""
@@ -980,7 +1014,7 @@ class DeckOperationDialog(QDialog):
         skip_field = dest_field if self._skip_existing_cb.isChecked() else None
         notes_data = self._collect_notes_from_deck(
             source_field=source_field,
-            context_field=context_field if context_field != "(None)" else None,
+            context_field=context_field if context_field != TEXT_NONE_OPTION else None,
             skip_if_has_content_in=skip_field
         )
         
@@ -1106,8 +1140,8 @@ class DeckOperationDialog(QDialog):
         if self._pause_event.is_set():
             # Currently paused, resume
             self._pause_event.clear()
-            self._pause_btn.setText("⏸ Pause")
-            self._pause_btn.setStyleSheet("background-color: #ffc107; color: black;")
+            self._pause_btn.setText(TEXT_PAUSE)
+            self._pause_btn.setStyleSheet(STYLE_PAUSE_BTN)
             self._status_label.setText("Resuming...")
         else:
             # Running, pause
@@ -1150,8 +1184,8 @@ class DeckOperationDialog(QDialog):
         
         # Enable control buttons
         self._pause_btn.setEnabled(True)
-        self._pause_btn.setText("⏸ Pause")
-        self._pause_btn.setStyleSheet("background-color: #ffc107; color: black;")
+        self._pause_btn.setText(TEXT_PAUSE)
+        self._pause_btn.setStyleSheet(STYLE_PAUSE_BTN)
         self._global_stop_btn.setEnabled(True)
     
     def _end_batch_ui(self) -> None:
@@ -1207,23 +1241,32 @@ class DeckOperationDialog(QDialog):
     ) -> None:
         """Run sentence generation batch with pause/resume support."""
         from ..sentence.sentence_generator import SentenceGenerator
-        from aqt.qt import QApplication
         
         generator = SentenceGenerator()
         total = len(notes_data)
-        success = 0
-        failure = 0
         
         language = self._sentence_lang_dropdown.currentText()
         difficulty = self._difficulty_dropdown.currentText()
         highlight = self._highlight_cb.isChecked()
         
-        # Start batch UI
+        # Initialize UI and progress
         self._start_batch_ui(total, "sentence generation")
         self._sentence_btn.setEnabled(False)
         self._stop_sentence_btn.setEnabled(True)
+        self._init_sentence_progress(notes_data)
         
-        # Initialize progress state
+        # Process notes
+        success, failure = self._process_sentence_notes(
+            notes_data, total, generator, language, difficulty, highlight,
+            sentence_field, trans_field, resume_ids
+        )
+        
+        # Cleanup
+        self._cleanup_sentence_batch()
+        self._on_finished(success, failure)
+    
+    def _init_sentence_progress(self, notes_data: List[Dict]) -> None:
+        """Initialize progress state for sentence batch."""
         note_ids = [n["note_id"] for n in notes_data]
         if self._current_deck_id is not None:
             self._progress_manager.start_run(
@@ -1231,82 +1274,103 @@ class DeckOperationDialog(QDialog):
                 deck_name=self._current_deck,
                 note_ids=note_ids
             )
+    
+    def _process_sentence_notes(
+        self, notes_data: List[Dict], total: int, generator,
+        language: str, difficulty: str, highlight: bool,
+        sentence_field: str, trans_field: str, resume_ids: Optional[Set[int]]
+    ) -> tuple[int, int]:
+        """Process all notes for sentence generation."""
+        from aqt.qt import QApplication
+        
+        success = failure = 0
         
         for i, note_data in enumerate(notes_data):
-            # Check cancel
-            if self._cancel_event.is_set():
+            if not self._check_batch_continue():
                 break
             
-            # Check pause (wait loop)
-            while self._pause_event.is_set() and not self._cancel_event.is_set():
-                QApplication.processEvents()
-                time.sleep(0.1)
-            
-            if self._cancel_event.is_set():
-                break
-            
-            # Skip if resuming and already done
             note_id = note_data["note_id"]
             if resume_ids and note_id not in resume_ids:
                 continue
             
-            note = note_data["note"]
-            word = note_data["word"]
-            
-            # Update progress UI
-            self._progress_bar.setValue(i + 1)
-            self._progress_label.setText(f"{i + 1} / {total}")
-            self._status_label.setText(f"Processing: {word[:20]}...")
-            self._update_eta(i + 1, total)
+            self._update_sentence_progress(i, total, note_data["word"])
             QApplication.processEvents()
             
-            try:
-                result = generator.generate_sentence_sync(
-                    word=word,
-                    target_language=language,
-                    difficulty=difficulty,
-                )
-                
-                sentence = result.get("translated_sentence", "")
-                translation = result.get("english_sentence", "")
-                
-                if highlight:
-                    from ..core.utils import highlight_word
-                    conj = result.get("translated_conjugated_word", word)
-                    eng_word = result.get("english_word", word)
-                    sentence = highlight_word(sentence, conj)
-                    translation = highlight_word(translation, eng_word)
-                
-                note[sentence_field] = sentence
-                if trans_field and trans_field in note:
-                    note[trans_field] = translation
-                mw.col.update_note(note)
-                
-                success += 1
-                if self._current_deck_id is not None:
-                    self._progress_manager.mark_success(self._current_deck_id, note_id)
-                self._key_manager.record_success("sentence")
-                
-            except Exception as e:
-                logger.error(f"Sentence generation failed for '{word}': {e}")
-                failure += 1
-                if self._current_deck_id is not None:
-                    self._progress_manager.mark_failure(self._current_deck_id, note_id, str(e))
-                self._key_manager.record_failure(str(e))
+            result_success = self._process_single_sentence(
+                note_data, generator, language, difficulty, highlight,
+                sentence_field, trans_field
+            )
             
-            # Rate limiting
-            time.sleep(2.0)
+            if result_success:
+                success += 1
+            else:
+                failure += 1
+            
+            time.sleep(2.0)  # Rate limiting
         
-        # Cleanup
+        return success, failure
+    
+    def _update_sentence_progress(self, i: int, total: int, word: str) -> None:
+        """Update progress UI for sentence generation."""
+        self._progress_bar.setValue(i + 1)
+        self._progress_label.setText(f"{i + 1} / {total}")
+        self._status_label.setText(f"Processing: {word[:20]}...")
+        self._update_eta(i + 1, total)
+    
+    def _process_single_sentence(
+        self, note_data: Dict, generator, language: str, difficulty: str,
+        highlight: bool, sentence_field: str, trans_field: str
+    ) -> bool:
+        """Process a single note for sentence generation. Returns True on success."""
+        note = note_data["note"]
+        note_id = note_data["note_id"]
+        word = note_data["word"]
+        
+        try:
+            result = generator.generate_sentence_sync(
+                word=word, target_language=language, difficulty=difficulty
+            )
+            
+            sentence = result.get("translated_sentence", "")
+            translation = result.get("english_sentence", "")
+            
+            if highlight:
+                sentence, translation = self._apply_sentence_highlighting(result, word, sentence, translation)
+            
+            note[sentence_field] = sentence
+            if trans_field and trans_field in note:
+                note[trans_field] = translation
+            mw.col.update_note(note)
+            
+            if self._current_deck_id is not None:
+                self._progress_manager.mark_success(self._current_deck_id, note_id)
+            self._key_manager.record_success("sentence")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Sentence generation failed for '{word}': {e}")
+            if self._current_deck_id is not None:
+                self._progress_manager.mark_failure(self._current_deck_id, note_id, str(e))
+            self._key_manager.record_failure(str(e))
+            return False
+    
+    def _apply_sentence_highlighting(
+        self, result: Dict, word: str, sentence: str, translation: str
+    ) -> tuple[str, str]:
+        """Apply highlighting to sentence and translation."""
+        from ..core.utils import highlight_word
+        conj = result.get("translated_conjugated_word", word)
+        eng_word = result.get("english_word", word)
+        return highlight_word(sentence, conj), highlight_word(translation, eng_word)
+    
+    def _cleanup_sentence_batch(self) -> None:
+        """Cleanup after sentence batch."""
         self._sentence_btn.setEnabled(True)
         self._stop_sentence_btn.setEnabled(False)
         self._end_batch_ui()
         
-        # Clear progress state if completed
         if not self._cancel_event.is_set() and self._current_deck_id is not None:
             self._progress_manager.clear_run(self._current_deck_id)
-        
-        self._on_finished(success, failure)
     
     def _resume_sentence_batch(self, pending_ids: List[int], run_info: Dict) -> None:
         """Resume an interrupted sentence batch."""
@@ -1392,24 +1456,32 @@ class DeckOperationDialog(QDialog):
         from ..image.image_generator import ImageGenerator
         from ..image.prompt_generator import ImagePromptGenerator
         from ..image.anki_media import AnkiMediaManager
-        from aqt.qt import QApplication
         
         image_gen = ImageGenerator(self._key_manager)
         prompt_gen = ImagePromptGenerator()
         media_mgr = AnkiMediaManager()
         
         total = len(notes_data)
-        success = 0
-        failure = 0
-        
         style = self._style_dropdown.currentText()
         
-        # Start batch UI
+        # Initialize UI and progress
         self._start_batch_ui(total, "image generation")
         self._image_btn.setEnabled(False)
         self._stop_image_btn.setEnabled(True)
+        self._init_image_progress(notes_data)
         
-        # Initialize progress state
+        # Process notes
+        success, failure = self._process_image_notes(
+            notes_data, total, style, image_gen, prompt_gen, media_mgr,
+            image_field, resume_ids
+        )
+        
+        # Cleanup
+        self._cleanup_image_batch()
+        self._on_finished(success, failure)
+    
+    def _init_image_progress(self, notes_data: List[Dict]) -> None:
+        """Initialize progress state for image batch."""
         note_ids = [n["note_id"] for n in notes_data]
         if self._current_deck_id is not None:
             self._progress_manager.start_run(
@@ -1417,92 +1489,118 @@ class DeckOperationDialog(QDialog):
                 deck_name=self._current_deck,
                 note_ids=note_ids
             )
+    
+    def _process_image_notes(
+        self, notes_data: List[Dict], total: int, style: str,
+        image_gen, prompt_gen, media_mgr, image_field: str,
+        resume_ids: Optional[Set[int]]
+    ) -> tuple[int, int]:
+        """Process all notes for image generation."""
+        from aqt.qt import QApplication
+        
+        success = failure = 0
         
         for i, note_data in enumerate(notes_data):
-            # Check cancel
-            if self._cancel_event.is_set():
+            if not self._check_batch_continue():
                 break
             
-            # Check pause (wait loop)
-            while self._pause_event.is_set() and not self._cancel_event.is_set():
-                QApplication.processEvents()
-                time.sleep(0.1)
-            
-            if self._cancel_event.is_set():
-                break
-            
-            # Skip if resuming and already done
             note_id = note_data["note_id"]
             if resume_ids and note_id not in resume_ids:
                 continue
             
-            note = note_data["note"]
-            word = note_data["word"]
-            
-            # Update progress UI
-            self._progress_bar.setValue(i + 1)
-            self._progress_label.setText(f"{i + 1} / {total}")
-            self._status_label.setText(f"Generating image: {word[:20]}...")
-            self._update_eta(i + 1, total)
+            self._update_image_progress(i, total, note_data["word"])
             QApplication.processEvents()
             
-            try:
-                # Generate prompt
-                prompt = prompt_gen.generate_prompt_sync(
-                    word=word,
-                    style=style
-                )
-                
-                # Generate image
-                result = image_gen.generate_image(prompt=prompt, word=word)
-                
-                if result.success and result.image_data:
-                    # Save to media using add_image_from_bytes
-                    media_result = media_mgr.add_image_from_bytes(
-                        image_data=result.image_data,
-                        word=word,
-                        extension=".png"
-                    )
-                    
-                    if media_result.success and media_result.filename:
-                        note[image_field] = f'<img src="{media_result.filename}">'
-                        mw.col.update_note(note)
-                        success += 1
-                        if self._current_deck_id is not None:
-                            self._progress_manager.mark_success(self._current_deck_id, note_id)
-                        self._key_manager.record_success("image")
-                    else:
-                        failure += 1
-                        if self._current_deck_id is not None:
-                            self._progress_manager.mark_failure(self._current_deck_id, note_id, media_result.error or "Save failed")
-                        logger.warning(f"Failed to save image: {media_result.error}")
-                else:
-                    failure += 1
-                    if self._current_deck_id is not None:
-                        self._progress_manager.mark_failure(self._current_deck_id, note_id, result.error or "Generation failed")
-                    self._key_manager.record_failure(result.error or "unknown")
-                    logger.warning(f"Image generation failed: {result.error}")
-                    
-            except Exception as e:
-                logger.error(f"Image generation failed for '{word}': {e}")
-                failure += 1
-                if self._current_deck_id is not None:
-                    self._progress_manager.mark_failure(self._current_deck_id, note_id, str(e))
-                self._key_manager.record_failure(str(e))
+            result_success = self._process_single_image(
+                note_data, style, image_gen, prompt_gen, media_mgr, image_field
+            )
             
-            # Rate limiting (images need more time)
-            time.sleep(3.0)
+            if result_success:
+                success += 1
+            else:
+                failure += 1
+            
+            time.sleep(3.0)  # Rate limiting
         
-        # Cleanup
+        return success, failure
+    
+    def _check_batch_continue(self) -> bool:
+        """Check if batch should continue (handles cancel and pause)."""
+        from aqt.qt import QApplication
+        
+        if self._cancel_event.is_set():
+            return False
+        
+        while self._pause_event.is_set() and not self._cancel_event.is_set():
+            QApplication.processEvents()
+            time.sleep(0.1)
+        
+        return not self._cancel_event.is_set()
+    
+    def _update_image_progress(self, i: int, total: int, word: str) -> None:
+        """Update progress UI for image generation."""
+        self._progress_bar.setValue(i + 1)
+        self._progress_label.setText(f"{i + 1} / {total}")
+        self._status_label.setText(f"Generating image: {word[:20]}...")
+        self._update_eta(i + 1, total)
+    
+    def _process_single_image(
+        self, note_data: Dict, style: str, image_gen, prompt_gen, media_mgr, image_field: str
+    ) -> bool:
+        """Process a single note for image generation. Returns True on success."""
+        note = note_data["note"]
+        note_id = note_data["note_id"]
+        word = note_data["word"]
+        
+        try:
+            prompt = prompt_gen.generate_prompt_sync(word=word, style=style)
+            result = image_gen.generate_image(prompt=prompt, word=word)
+            
+            if result.success and result.image_data:
+                return self._save_generated_image(note, note_id, image_field, word, result, media_mgr)
+            else:
+                self._mark_image_failure(note_id, result.error or "Generation failed")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Image generation failed for '{word}': {e}")
+            self._mark_image_failure(note_id, str(e))
+            return False
+    
+    def _save_generated_image(
+        self, note, note_id: int, image_field: str, word: str, result, media_mgr
+    ) -> bool:
+        """Save generated image to note. Returns True on success."""
+        media_result = media_mgr.add_image_from_bytes(
+            image_data=result.image_data, word=word, extension=".png"
+        )
+        
+        if media_result.success and media_result.filename:
+            note[image_field] = f'<img src="{media_result.filename}">'
+            mw.col.update_note(note)
+            if self._current_deck_id is not None:
+                self._progress_manager.mark_success(self._current_deck_id, note_id)
+            self._key_manager.record_success("image")
+            return True
+        else:
+            self._mark_image_failure(note_id, media_result.error or "Save failed")
+            logger.warning(f"Failed to save image: {media_result.error}")
+            return False
+    
+    def _mark_image_failure(self, note_id: int, error: str) -> None:
+        """Mark image generation failure in progress state."""
+        if self._current_deck_id is not None:
+            self._progress_manager.mark_failure(self._current_deck_id, note_id, error)
+        self._key_manager.record_failure(error)
+    
+    def _cleanup_image_batch(self) -> None:
+        """Cleanup after image batch."""
         self._image_btn.setEnabled(True)
         self._stop_image_btn.setEnabled(False)
         self._end_batch_ui()
         
-        # Clear progress state if completed
         if not self._cancel_event.is_set() and self._current_deck_id is not None:
             self._progress_manager.clear_run(self._current_deck_id)
-        
-        self._on_finished(success, failure)
     
     def _resume_image_batch(self, pending_ids: List[int], run_info: Dict) -> None:
         """Resume an interrupted image batch."""
@@ -1641,27 +1739,37 @@ class DeckOperationDialog(QDialog):
     def _handle_api_test_error(self, error: Exception) -> None:
         """Handle and classify API test errors with helpful messages."""
         error_msg = str(error).lower()
-        error_type = type(error).__name__
         
-        # Classify the error for user-friendly messages
-        if "api key" in error_msg or "api_key" in error_msg:
-            showWarning("❌ Invalid API Key\n\nPlease check your API key is correct.")
-        elif "resource exhausted" in error_msg or "quota exceeded" in error_msg:
-            showWarning("❌ API Quota Exceeded\n\nYour API quota has been exhausted. "
-                       "Please wait or try a different API key.")
-        elif "rate limit" in error_msg or "too many requests" in error_msg or "429" in str(error):
+        # Map error patterns to user-friendly messages
+        error_patterns = [
+            (["api key", "api_key"], "❌ Invalid API Key\n\nPlease check your API key is correct."),
+            (["resource exhausted", "quota exceeded"], 
+             "❌ API Quota Exceeded\n\nYour API quota has been exhausted. Please wait or try a different API key."),
+            (["rate limit", "too many requests"], "❌ Rate Limit Reached\n\nPlease wait a moment and try again."),
+            (["permission", "forbidden"], "❌ Permission Denied\n\nYour API key may not have access to this model."),
+            (["connection", "timeout", "network"], "❌ Network Error\n\nPlease check your internet connection."),
+            (["invalid", "bad request"], f"❌ Invalid Request\n\n{error}"),
+        ]
+        
+        # Check for 429 in original error
+        if "429" in str(error):
             showWarning("❌ Rate Limit Reached\n\nPlease wait a moment and try again.")
-        elif "permission" in error_msg or "forbidden" in error_msg:
-            showWarning("❌ Permission Denied\n\nYour API key may not have access to this model.")
-        elif "model" in error_msg and ("not found" in error_msg or "does not exist" in error_msg):
+            return
+        
+        # Check model not found separately (needs both conditions)
+        if "model" in error_msg and ("not found" in error_msg or "does not exist" in error_msg):
             showWarning("❌ Model Not Found\n\nThe selected model may not be available. "
                        "Try using 'gemini-2.5-flash' instead.")
-        elif "connection" in error_msg or "timeout" in error_msg or "network" in error_msg:
-            showWarning("❌ Network Error\n\nPlease check your internet connection.")
-        elif "invalid" in error_msg or "bad request" in error_msg:
-            showWarning(f"❌ Invalid Request\n\n{error}")
-        else:
-            showWarning(f"❌ API Test Failed ({error_type}):\n\n{error}")
+            return
+        
+        # Check other patterns
+        for patterns, message in error_patterns:
+            if any(p in error_msg for p in patterns):
+                showWarning(message)
+                return
+        
+        # Default error message
+        showWarning(f"❌ API Test Failed ({type(error).__name__}):\n\n{error}")
 
 
 # Legacy classes for backward compatibility

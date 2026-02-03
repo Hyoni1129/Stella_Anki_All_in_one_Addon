@@ -174,48 +174,57 @@ class GeminiClient:
         
         for attempt in range(1, max_retries + 1):
             try:
-                model = self._get_model(model_name, generation_config)
-                
-                self._logger.debug(f"Generating text (attempt {attempt}/{max_retries})")
-                response = model.generate_content(prompt)
-                
-                if not response:
-                    raise GeminiError("API returned None response")
-                
-                response_text = response.text if response.text else ""
-                
-                if not response_text.strip():
-                    raise GeminiError("API returned empty response")
-                
-                # Record success
+                response_text = self._attempt_generate(prompt, model_name, generation_config, attempt, max_retries)
                 self._key_manager.record_success(operation="translation", count=1)
-                
-                return response_text.strip()
+                return response_text
                 
             except Exception as e:
                 last_error = e
-                error_str = str(e)
-                
-                self._logger.warning(f"API call failed (attempt {attempt}): {error_str}")
-                
-                # Check if we should rotate keys
-                if should_rotate_key(e):
-                    rotated, new_key_id = self._key_manager.record_failure(error_str)
-                    if rotated:
-                        self._logger.info(f"Rotated to new API key: {new_key_id}")
-                        self._api_key = None  # Clear cached key to get new one
-                        continue
-                
-                # Record failure
-                self._key_manager.record_failure(error_str)
-                
-                if attempt < max_retries:
-                    self._logger.info(f"Retrying in {backoff:.1f} seconds...")
-                    time.sleep(backoff)
+                if not self._handle_generation_error(e, attempt, max_retries, backoff):
                     backoff *= 2  # Exponential backoff
         
         error_msg = format_error_message(last_error, "generate text")
         raise GeminiError(error_msg)
+    
+    def _attempt_generate(
+        self, prompt: str, model_name: Optional[str],
+        generation_config: Optional[Dict[str, Any]], attempt: int, max_retries: int
+    ) -> str:
+        """Single attempt to generate text."""
+        model = self._get_model(model_name, generation_config)
+        self._logger.debug(f"Generating text (attempt {attempt}/{max_retries})")
+        response = model.generate_content(prompt)
+        
+        if not response:
+            raise GeminiError("API returned None response")
+        
+        response_text = response.text if response.text else ""
+        if not response_text.strip():
+            raise GeminiError("API returned empty response")
+        
+        return response_text.strip()
+    
+    def _handle_generation_error(
+        self, error: Exception, attempt: int, max_retries: int, backoff: float
+    ) -> bool:
+        """Handle generation error. Returns True if retry should be skipped."""
+        error_str = str(error)
+        self._logger.warning(f"API call failed (attempt {attempt}): {error_str}")
+        
+        if should_rotate_key(error):
+            rotated, new_key_id = self._key_manager.record_failure(error_str)
+            if rotated:
+                self._logger.info(f"Rotated to new API key: {new_key_id}")
+                self._api_key = None
+                return True  # Skip delay, retry immediately with new key
+        
+        self._key_manager.record_failure(error_str)
+        
+        if attempt < max_retries:
+            self._logger.info(f"Retrying in {backoff:.1f} seconds...")
+            time.sleep(backoff)
+        
+        return False
     
     def generate_json(
         self,
@@ -481,7 +490,7 @@ Example format:
                 return False, "API returned empty response."
                 
         except Exception as e:
-            error_type, message = classify_error(e)
+            _, message = classify_error(e)
             return False, message
 
 

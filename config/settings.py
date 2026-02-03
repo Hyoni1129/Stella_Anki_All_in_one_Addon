@@ -15,6 +15,9 @@ import json
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field, asdict
 
+# Constants for repeated literals
+DEFAULT_MODEL = "gemini-2.5-flash"
+
 
 @dataclass
 class APIConfig:
@@ -23,7 +26,7 @@ class APIConfig:
     rotation_enabled: bool = True
     cooldown_hours: int = 24
     consecutive_failure_threshold: int = 5
-    model: str = "gemini-2.5-flash"
+    model: str = DEFAULT_MODEL
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "APIConfig":
@@ -32,7 +35,7 @@ class APIConfig:
             rotation_enabled=data.get("rotation_enabled", True),
             cooldown_hours=data.get("cooldown_hours", 24),
             consecutive_failure_threshold=data.get("consecutive_failure_threshold", 5),
-            model=data.get("model", "gemini-2.5-flash"),
+            model=data.get("model", DEFAULT_MODEL),
         )
 
 
@@ -48,7 +51,7 @@ class TranslationConfig:
     batch_delay_seconds: int = 8
     skip_existing: bool = True
     overwrite_existing: bool = False
-    model_name: str = "gemini-2.5-flash"
+    model_name: str = DEFAULT_MODEL
     
     @property
     def target_language(self) -> str:
@@ -67,7 +70,7 @@ class TranslationConfig:
             batch_delay_seconds=data.get("batch_delay_seconds", 8),
             skip_existing=data.get("skip_existing", True),
             overwrite_existing=data.get("overwrite_existing", False),
-            model_name=data.get("model_name", "gemini-2.5-flash"),
+            model_name=data.get("model_name", DEFAULT_MODEL),
         )
 
 
@@ -286,7 +289,7 @@ class ConfigManager:
         try:
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(config_dict, f, indent=4, ensure_ascii=False)
-        except Exception as e:
+        except Exception:
             pass  # Silent fail - config save not critical
     
     def reload(self) -> None:
