@@ -780,7 +780,11 @@ class DeckOperationDialog(QDialog):
         
         # Get fields from first card in deck
         try:
-            deck_id = mw.col.decks.id(deck_name)
+            # Use id_for_name for safer lookup (returns None if not found, vs id() which creates)
+            deck_id = mw.col.decks.id_for_name(deck_name)
+            if deck_id is None:
+                # Fallback to id() method if id_for_name not available or returns None
+                deck_id = mw.col.decks.id(deck_name)
             logger.info(f"Deck ID: {deck_id}")
             
             self._current_deck_id = deck_id  # Track for progress operations
@@ -812,7 +816,9 @@ class DeckOperationDialog(QDialog):
             
         except Exception as e:
             logger.error(f"Error loading deck fields: {e}", exc_info=True)
+            showWarning(f"Failed to load deck fields:\n{str(e)}")
             self._status_label.setText(f"Error: {e}")
+            self._clear_field_dropdowns()
     
     def _update_field_dropdowns(self, fields: List[str]) -> None:
         """Update all field dropdown menus."""
