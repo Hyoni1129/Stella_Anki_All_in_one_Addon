@@ -129,7 +129,9 @@ class DeckOperationDialog(QDialog):
         self._success_count = 0
         self._failure_count = 0
         
+        logger.info("DeckOperationDialog __init__: calling _setup_ui...")
         self._setup_ui()
+        logger.info("DeckOperationDialog __init__: _setup_ui completed, calling _load_decks...")
         self._load_decks()
         self._check_pending_operations()
         logger.info("DeckOperationDialog initialized")
@@ -281,9 +283,18 @@ class DeckOperationDialog(QDialog):
         
         # Connect deck change signal now that all tabs/widgets are created
         self._deck_dropdown.currentTextChanged.connect(self._on_deck_changed)
+        
+        # Debug: Verify all dropdowns are created at end of _setup_ui
+        logger.info(f"_setup_ui complete. Dropdown status: "
+                    f"source={self._source_dropdown is not None}, "
+                    f"context={self._context_dropdown is not None}, "
+                    f"dest={self._dest_dropdown is not None}, "
+                    f"sentence_word={self._sentence_word_dropdown is not None}, "
+                    f"image_word={self._image_word_dropdown is not None}")
     
     def _create_translation_tab(self) -> QWidget:
         """Create the translation tab."""
+        logger.info("Creating translation tab...")
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
@@ -321,6 +332,10 @@ class DeckOperationDialog(QDialog):
         fields_layout.addLayout(dest_row)
         
         layout.addWidget(fields_group)
+        
+        # Debug: Confirm dropdowns were created
+        logger.info(f"Translation tab dropdowns created: source={self._source_dropdown is not None}, "
+                    f"context={self._context_dropdown is not None}, dest={self._dest_dropdown is not None}")
         
         # Options
         options_group = QGroupBox("Options")
@@ -407,6 +422,7 @@ class DeckOperationDialog(QDialog):
     
     def _create_sentence_tab(self) -> QWidget:
         """Create the sentence generation tab."""
+        logger.info("Creating sentence tab...")
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
@@ -447,6 +463,10 @@ class DeckOperationDialog(QDialog):
         fields_layout.addLayout(trans_row)
         
         layout.addWidget(fields_group)
+        
+        # Debug: Confirm dropdowns were created
+        logger.info(f"Sentence tab dropdowns created: word={self._sentence_word_dropdown is not None}, "
+                    f"field={self._sentence_field_dropdown is not None}, trans={self._sentence_trans_dropdown is not None}")
         
         # Options
         options_group = QGroupBox("Options")
@@ -511,6 +531,7 @@ class DeckOperationDialog(QDialog):
     
     def _create_image_tab(self) -> QWidget:
         """Create the image generation tab."""
+        logger.info("Creating image tab...")
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
@@ -543,6 +564,10 @@ class DeckOperationDialog(QDialog):
         fields_layout.addLayout(img_row)
         
         layout.addWidget(fields_group)
+        
+        # Debug: Confirm dropdowns were created
+        logger.info(f"Image tab dropdowns created: word={self._image_word_dropdown is not None}, "
+                    f"field={self._image_field_dropdown is not None}")
         
         # Style and Prompt Options
         options_group = QGroupBox("Style & Prompt Options")
@@ -732,18 +757,25 @@ class DeckOperationDialog(QDialog):
             return
         
         deck_names = []
-        for deck in mw.col.decks.all_names_and_ids():
-            deck_id = mw.col.decks.id(deck.name)
-            card_ids = mw.col.decks.cids(deck_id)
+        # Modern Anki (24.02+): Use mw.col.decks.all() instead of all_names_and_ids()
+        for deck in mw.col.decks.all():
+            deck_name = deck['name']
+            # Modern Anki: Use find_cards instead of cids()
+            # quote the deck name to handle spaces
+            query = f'"deck:{deck_name}"'
+            card_ids = mw.col.find_cards(query)
+            
             if card_ids:  # Only include decks with cards
-                deck_names.append(deck.name)
+                deck_names.append(deck_name)
         
+        # Sort alphabetically
+        deck_names.sort()
         logger.info(f"Found {len(deck_names)} decks with cards")
         
         if not deck_names:
             self._deck_dropdown.addItem("(No decks with cards)")
             return
-        
+            
         # Block signals temporarily to prevent premature triggering
         self._deck_dropdown.blockSignals(True)
         self._deck_dropdown.clear()
@@ -780,19 +812,40 @@ class DeckOperationDialog(QDialog):
         
         # Get fields from first card in deck
         try:
-            # Use id_for_name for safer lookup (returns None if not found, vs id() which creates)
-            deck_id = mw.col.decks.id_for_name(deck_name)
-            if deck_id is None:
-                # Fallback to id() method if id_for_name not available or returns None
-                deck_id = mw.col.decks.id(deck_name)
-            logger.info(f"Deck ID: {deck_id}")
+            # Robust deck ID lookup
+            deck_id = None
+            if hasattr(mw.col.decks, 'id_for_name'):
+                deck_id = mw.col.decks.id_for_name(deck_name)
+            elif hasattr(mw.col.decks, 'by_name'): # Try by_name if id_for_name missing
+                d = mw.col.decks.by_name(deck_name)
+                if d:
+                    deck_id = d.get('id')
             
-            self._current_deck_id = deck_id  # Track for progress operations
-            card_ids = mw.col.decks.cids(deck_id)
-            logger.info(f"Found {len(card_ids)} cards in deck")
+            if deck_id is None:
+                # Fallback to .id() - creates if missing, but we need ID
+                deck_id = mw.col.decks.id(deck_name)
+            
+            self._current_deck_id = deck_id
+            logger.info(f"Resolved Deck ID: {deck_id}")
+
+            # Modern Anki Search Strategy:
+            # Prefer searching by DID (deck id) which is safer than name matching
+            if deck_id:
+                query = f"did:{deck_id}"
+            else:
+                # Fallback to name search if ID somehow failed
+                query = f'"deck:{deck_name}"'
+
+            card_ids = mw.col.find_cards(query)
+            logger.info(f"Found {len(card_ids)} cards using query: {query}")
             
             if not card_ids:
-                logger.warning("No cards found in deck, clearing dropdowns")
+                msg = f"No cards found in deck '{deck_name}' (ID: {deck_id}).\nQuery used: {query}\n\nCannot retrieve fields."
+                logger.warning(msg)
+                # Only show warning if user actually selected a deck that claims to have cards
+                # but find_cards returned empty (rare sync edge case)
+                if deck_name != "(No decks with cards)":
+                    showWarning(msg)
                 self._clear_field_dropdowns()
                 return
             
@@ -824,43 +877,33 @@ class DeckOperationDialog(QDialog):
         """Update all field dropdown menus."""
         logger.info(f"Updating field dropdowns with {len(fields)} fields: {fields}")
         
-        # Translation tab
-        for dropdown in [self._source_dropdown, self._dest_dropdown]:
-            if dropdown:
+        # Helper function to safely update a dropdown
+        def update_dropdown(dropdown: Optional[QComboBox], name: str, add_none_option: bool = False) -> bool:
+            if dropdown is not None:
                 dropdown.clear()
+                if add_none_option:
+                    dropdown.addItem(TEXT_NONE_OPTION)
                 dropdown.addItems(fields)
                 dropdown.setEnabled(True)
-                logger.info(f"Enabled source/dest dropdown with {dropdown.count()} items")
+                logger.debug(f"Enabled {name} dropdown with {dropdown.count()} items")
+                return True
             else:
-                logger.warning("Translation source/dest dropdown is None!")
+                logger.warning(f"{name} dropdown is None!")
+                return False
         
-        if self._context_dropdown:
-            self._context_dropdown.clear()
-            self._context_dropdown.addItem(TEXT_NONE_OPTION)
-            self._context_dropdown.addItems(fields)
-            self._context_dropdown.setEnabled(True)
-            logger.info(f"Enabled context dropdown with {self._context_dropdown.count()} items")
-        else:
-            logger.warning("Context dropdown is None!")
+        # Translation tab - use direct attribute access
+        update_dropdown(self._source_dropdown, "Translation source")
+        update_dropdown(self._context_dropdown, "Translation context", add_none_option=True)
+        update_dropdown(self._dest_dropdown, "Translation dest")
         
         # Sentence tab
-        for dropdown in [self._sentence_word_dropdown, self._sentence_field_dropdown, 
-                         self._sentence_trans_dropdown]:
-            if dropdown:
-                dropdown.clear()
-                dropdown.addItems(fields)
-                dropdown.setEnabled(True)
-            else:
-                logger.warning("Sentence dropdown is None!")
+        update_dropdown(self._sentence_word_dropdown, "Sentence word")
+        update_dropdown(self._sentence_field_dropdown, "Sentence field")
+        update_dropdown(self._sentence_trans_dropdown, "Sentence trans")
         
         # Image tab
-        for dropdown in [self._image_word_dropdown, self._image_field_dropdown]:
-            if dropdown:
-                dropdown.clear()
-                dropdown.addItems(fields)
-                dropdown.setEnabled(True)
-            else:
-                logger.warning("Image dropdown is None!")
+        update_dropdown(self._image_word_dropdown, "Image word")
+        update_dropdown(self._image_field_dropdown, "Image field")
         
         logger.info("Field dropdowns updated successfully")
         
@@ -931,8 +974,9 @@ class DeckOperationDialog(QDialog):
             return []
         
         try:
-            deck_id = mw.col.decks.id(self._current_deck)
-            card_ids = mw.col.decks.cids(deck_id)
+            # Modern Anki: Use find_cards
+            query = f'"deck:{self._current_deck}"'
+            card_ids = mw.col.find_cards(query)
             
             notes_data = []
             seen_notes: Set[int] = set()
