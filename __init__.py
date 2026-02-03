@@ -31,13 +31,15 @@ if __name__ != "__main__":
         if lib_path not in sys.path:
             sys.path.insert(0, lib_path)
         
-        # Handle google namespace package issues
+        # Handle google namespace package issues - CRITICAL for bundled libraries
+        # Must prioritize our bundled version over any system-installed packages
+        google_lib_path = os.path.join(lib_path, "google")
         if "google" in sys.modules:
             import google
             if hasattr(google, "__path__"):
-                google_lib_path = os.path.join(lib_path, "google")
                 if google_lib_path not in google.__path__:
-                    google.__path__.append(google_lib_path)
+                    # Insert at beginning to prioritize bundled version
+                    google.__path__.insert(0, google_lib_path)
         
         from aqt import mw
         

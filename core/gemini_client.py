@@ -26,20 +26,27 @@ _lib_path = os.path.join(_addon_dir, "lib")
 if _lib_path not in sys.path:
     sys.path.insert(0, _lib_path)
 
-# Handle google namespace package conflicts
+# Handle google namespace package conflicts - CRITICAL for bundled libraries
+_google_lib_path = os.path.join(_lib_path, "google")
 if "google" in sys.modules:
     import google
-    google_lib_path = os.path.join(_lib_path, "google")
-    if hasattr(google, "__path__") and google_lib_path not in google.__path__:
-        google.__path__.append(google_lib_path)
+    if hasattr(google, "__path__"):
+        # Insert at beginning to prioritize our bundled version
+        if _google_lib_path not in google.__path__:
+            google.__path__.insert(0, _google_lib_path)
+else:
+    # If google not yet imported, sys.path is sufficient
+    pass
 
 # Import Gemini SDK (legacy google-generativeai)
 try:
     import google.generativeai as genai
     GENAI_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     GENAI_AVAILABLE = False
     genai = None
+    import traceback
+    _genai_import_error = traceback.format_exc()
 
 from .logger import StellaLogger
 from .api_key_manager import APIKeyManager, get_api_key_manager
@@ -102,9 +109,10 @@ class GeminiClient:
     def _configure_api(self, api_key: str) -> None:
         """Configure the Gemini API with a key."""
         try:
-            genai.configure(api_key=api_key)
+            # Use REST transport to avoid gRPC dependency issues
+            genai.configure(api_key=api_key, transport="rest")
             self._api_key = api_key
-            self._logger.debug("Gemini API configured")
+            self._logger.debug("Gemini API configured with REST transport")
         except Exception as e:
             self._logger.error(f"Failed to configure Gemini API: {e}")
             raise GeminiError(f"Failed to configure API: {e}")

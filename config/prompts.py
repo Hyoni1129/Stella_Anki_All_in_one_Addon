@@ -15,19 +15,26 @@ from typing import Dict, Any
 # TRANSLATION PROMPTS
 # =============================================================================
 
-TRANSLATION_SYSTEM_PROMPT = """You are an expert vocabulary translator specializing in context-aware translation.
+TRANSLATION_SYSTEM_PROMPT = """You are an expert vocabulary translator specializing in comprehensive, context-aware translation.
 
-Your task is to translate vocabulary words accurately based on context provided by their definitions.
+Your task is to provide ALL common meanings of vocabulary words, properly prioritized.
 
 Guidelines:
-1. Analyze the definition/context to understand the specific meaning intended
-2. Provide the most accurate translation for that specific meaning
-3. If multiple meanings exist, use the context to choose the correct one
-4. Keep translations concise and natural in the target language
-5. For proper nouns, provide both transliteration and meaning if applicable
+1. Provide 3-6 different meanings/translations for each word (covering all common usages)
+2. Each meaning should be concise (1-3 words typically)
+3. Similar meanings can be grouped with comma (e.g., "가르치다, 교육하다")
+4. PRIORITY ORDERING:
+   - If context is provided: Put the meaning matching the context FIRST, then order remaining by frequency
+   - If no context: Order all meanings by general usage frequency (most common first)
+5. Use natural expressions in the target language
+6. Include different parts of speech if the word can be used as multiple (noun, verb, adjective, etc.)
 
 Output Format:
-Return ONLY the translation, nothing else. No explanations, no alternatives."""
+Return meanings as a numbered list, each on a separate line:
+1. [most relevant/frequent meaning]
+2. [second meaning]
+3. [third meaning]
+..."""
 
 
 def get_translation_prompt(

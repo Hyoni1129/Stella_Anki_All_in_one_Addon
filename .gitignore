@@ -25,3 +25,25 @@ Thumbs.db
 # SonarQube
 sonarqube_setup/
 .scannerwork/
+
+# Sensitive templates (keep in repo)
+# api_keys.template.json
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDEs and editors
+.vscode/
+.idea/
+
+# Testing / coverage
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# Temporary files
+*.tmp
+*.bak
+*.backup

@@ -24,7 +24,13 @@ import typing
 from typing import Any, Callable, Union
 from typing_extensions import TypedDict
 
-import pydantic
+# Make pydantic optional
+try:
+    import pydantic
+    PYDANTIC_AVAILABLE = True
+except ImportError:
+    pydantic = None
+    PYDANTIC_AVAILABLE = False
 
 from google.generativeai.types import file_types
 from google.generativeai import protos
@@ -335,6 +341,9 @@ def to_contents(contents: ContentsType) -> list[protos.Content]:
 
 
 def _schema_for_class(cls: TypedDict) -> dict[str, Any]:
+    if not PYDANTIC_AVAILABLE:
+        # Fallback: return a basic schema without pydantic
+        return {"type": "object"}
     schema = _build_schema("dummy", {"dummy": (cls, pydantic.Field())})
     return schema["properties"]["dummy"]
 
@@ -376,10 +385,13 @@ def _schema_for_function(
             #     param.default if param.default != inspect.Parameter.empty
             #     else None
             # ),
-            field = pydantic.Field(
-                # We support user-provided descriptions.
-                description=descriptions.get(name, None)
-            )
+            if PYDANTIC_AVAILABLE:
+                field = pydantic.Field(
+                    # We support user-provided descriptions.
+                    description=descriptions.get(name, None)
+                )
+            else:
+                field = None  # Fallback when pydantic not available
 
             # 1. We infer the argument type here: use Any rather than None so
             # it will not try to auto-infer the type based on the default value.
@@ -417,6 +429,9 @@ def _schema_for_function(
 
 
 def _build_schema(fname, fields_dict):
+    if not PYDANTIC_AVAILABLE:
+        # Fallback: return a basic schema without pydantic
+        return {"type": "object", "properties": {k: {"type": "string"} for k in fields_dict}}
     parameters = pydantic.create_model(fname, **fields_dict).model_json_schema()
     defs = parameters.pop("$defs", {})
     # flatten the defs

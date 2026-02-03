@@ -25,12 +25,29 @@ _lib_path = os.path.join(_addon_dir, "lib")
 if _lib_path not in sys.path:
     sys.path.insert(0, _lib_path)
 
+# Handle google namespace package - must be done BEFORE importing google.generativeai
+_google_lib_path = os.path.join(_lib_path, "google")
+if "google" in sys.modules:
+    import google
+    if hasattr(google, "__path__"):
+        if _google_lib_path not in google.__path__:
+            google.__path__.insert(0, _google_lib_path)
+else:
+    # If google module not yet imported, create a namespace package manually
+    import importlib.util
+    if os.path.isdir(_google_lib_path):
+        # Pre-setup the google namespace to include our lib path
+        pass  # The sys.path insertion above should handle this
+
 try:
     import google.generativeai as genai
     GENAI_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     GENAI_AVAILABLE = False
     genai = None
+    # Log the actual import error for debugging
+    import traceback
+    _import_error = traceback.format_exc()
 
 from ..core.logger import StellaLogger
 from ..core.api_key_manager import get_api_key_manager
@@ -219,11 +236,16 @@ class BatchTranslator(QRunnable):
     def _configure_api(self) -> None:
         """Configure Gemini API with current key."""
         if not GENAI_AVAILABLE:
-            raise RuntimeError("google-generativeai not available")
+            # Provide more detailed error message
+            error_msg = "google-generativeai not available"
+            if '_import_error' in globals():
+                error_msg += f"\nImport error details:\n{_import_error}"
+            raise RuntimeError(error_msg)
         
         key = self._get_active_api_key()
         if key:
-            genai.configure(api_key=key)
+            # Use REST transport to avoid gRPC dependency issues
+            genai.configure(api_key=key, transport="rest")
     
     def _build_model(self):
         """Build Gemini model instance."""
@@ -240,7 +262,10 @@ class BatchTranslator(QRunnable):
                                 "type": "object",
                                 "properties": {
                                     "word": {"type": "string"},
-                                    "translation": {"type": "string"},
+                                    "translation": {
+                                        "type": "string",
+                                        "description": "Numbered list of meanings, e.g., '1. 가르치다, 교육하다\n2. 지시하다, 명령하다\n3. 알리다, 전하다'"
+                                    },
                                 },
                                 "required": ["word", "translation"],
                             },
@@ -248,8 +273,8 @@ class BatchTranslator(QRunnable):
                     },
                     "required": ["translations"],
                 },
-                "temperature": 0.3,
-                "max_output_tokens": 2048,
+                "temperature": 0.4,  # Slightly higher for more varied meanings
+                "max_output_tokens": 4096,  # Increased for multiple meanings
             },
         )
     
@@ -283,7 +308,13 @@ class BatchTranslator(QRunnable):
         prompt = f"""{TRANSLATION_SYSTEM_PROMPT}
 
 Translate the following words to {self.target_language}.
-For each word, provide the most appropriate translation based on the given context.
+For each word, provide 3-6 different meanings as a numbered list.
+
+IMPORTANT:
+- If context is provided for a word, the meaning matching that context should be listed FIRST
+- If no context, order meanings by general usage frequency (most common first)
+- Group similar meanings with commas (e.g., "가르치다, 교육하다")
+- Each numbered item should be on its own line
 
 Words to translate:
 {words_list}
@@ -291,8 +322,21 @@ Words to translate:
 Return a JSON object with this exact structure:
 {{
     "translations": [
-        {{"word": "original_word", "translation": "translated_word"}},
+        {{
+            "word": "original_word",
+            "translation": "1. [first meaning]\n2. [second meaning]\n3. [third meaning]"
+        }},
         ...
+    ]
+}}
+
+Example for "instruct" with context "The teacher instructs the students":
+{{
+    "translations": [
+        {{
+            "word": "instruct",
+            "translation": "1. 가르치다, 교육하다\n2. 지시하다, 명령하다\n3. 알리다, 전하다\n4. 설명하다"
+        }}
     ]
 }}"""
         

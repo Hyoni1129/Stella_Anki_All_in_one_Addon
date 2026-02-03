@@ -16,6 +16,21 @@ from datetime import datetime
 import time
 import tempfile
 import os
+import sys
+
+# Setup lib path for bundled dependencies
+_addon_dir = os.path.dirname(os.path.dirname(__file__))
+_lib_path = os.path.join(_addon_dir, "lib")
+if _lib_path not in sys.path:
+    sys.path.insert(0, _lib_path)
+
+# Handle google namespace package conflicts
+_google_lib_path = os.path.join(_lib_path, "google")
+if "google" in sys.modules:
+    import google
+    if hasattr(google, "__path__"):
+        if _google_lib_path not in google.__path__:
+            google.__path__.insert(0, _google_lib_path)
 
 if TYPE_CHECKING:
     from aqt.editor import Editor
