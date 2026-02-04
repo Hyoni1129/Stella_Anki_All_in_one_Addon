@@ -239,6 +239,17 @@ class DeckOperationDialog(QDialog):
         status_row.addWidget(self._eta_label)
         progress_layout.addLayout(status_row)
         
+        # API Key status row
+        api_key_row = QHBoxLayout()
+        self._api_key_status_label = QLabel("🔑 API Key: --")
+        self._api_key_status_label.setStyleSheet("color: #888; font-size: 11px;")
+        api_key_row.addWidget(self._api_key_status_label)
+        api_key_row.addStretch()
+        progress_layout.addLayout(api_key_row)
+        
+        # Update initial key status
+        self._update_api_key_status()
+        
         progress_row = QHBoxLayout()
         self._progress_bar = QProgressBar()
         self._progress_bar.setTextVisible(True)
@@ -1539,6 +1550,7 @@ class DeckOperationDialog(QDialog):
         self._status_label.setText(
             f"Processing... ✅ {success} | ❌ {failure} | Rate: {rate:.1f}%"
         )
+        self._update_api_key_status()
     
     def _on_error_detail(self, error_type: str, message: str, count: int) -> None:
         """Log error details."""
@@ -1635,6 +1647,27 @@ class DeckOperationDialog(QDialog):
         self._pause_btn.setEnabled(False)
         self._global_stop_btn.setEnabled(False)
         self._eta_label.setText("ETA: --")
+        self._update_api_key_status()
+    
+    def _update_api_key_status(self) -> None:
+        """Update the API key status display."""
+        try:
+            total_keys = self._key_manager.get_key_count()
+            if total_keys == 0:
+                self._api_key_status_label.setText("🔑 API Key: No keys configured")
+                self._api_key_status_label.setStyleSheet("color: #dc3545; font-size: 11px;")
+                return
+            
+            current_index = self._key_manager.get_current_key_index() + 1  # 1-based for display
+            current_key_id = self._key_manager.get_current_key_id() or "--"
+            
+            self._api_key_status_label.setText(
+                f"🔑 API Key: {current_key_id} (using key {current_index} of {total_keys})"
+            )
+            self._api_key_status_label.setStyleSheet("color: #28a745; font-size: 11px;")
+        except Exception as e:
+            logger.warning(f"Failed to update API key status: {e}")
+            self._api_key_status_label.setText("🔑 API Key: --")
     
     # ========== Preview Features ==========
 
@@ -1742,15 +1775,22 @@ class DeckOperationDialog(QDialog):
         # Preview uses individual requests with delay for safety (not batch mode)
         PREVIEW_DELAY_SECONDS = 5.0  # Delay between requests to avoid rate limits
         
+        # Get current API key info for display
+        total_keys = self._key_manager.get_key_count()
+        current_key_num = self._key_manager.get_current_key_index() + 1
+        current_key_id = self._key_manager.get_current_key_id() or "--"
+        key_info = f"🔑 API Key: {current_key_id} (key {current_key_num}/{total_keys})"
+        
         progress = QProgressDialog(
-            "⏳ Preview Mode (Safe Testing)\n\n"
-            "Generating previews one-by-one with delay...\n"
-            "This is slower than batch mode for stability.",
+            f"⏳ Preview Mode (Safe Testing)\n\n"
+            f"Generating previews one-by-one with delay...\n"
+            f"This is slower than batch mode for stability.\n\n"
+            f"{key_info}",
             "Cancel", 0, sample_size, self
         )
         progress.setWindowModality(Qt.WindowModality.WindowModal)
         progress.setMinimumDuration(0)
-        progress.setMinimumWidth(400)
+        progress.setMinimumWidth(450)
         progress.setValue(0)
         
         results = []
@@ -1762,10 +1802,16 @@ class DeckOperationDialog(QDialog):
                 
                 # Add delay between requests (except for the first one)
                 if i > 0:
+                    # Update key info (may have rotated)
+                    current_key_num = self._key_manager.get_current_key_index() + 1
+                    current_key_id = self._key_manager.get_current_key_id() or "--"
+                    key_info = f"🔑 API Key: {current_key_id} (key {current_key_num}/{total_keys})"
+                    
                     progress.setLabelText(
                         f"⏳ Preview Mode (Safe Testing)\n\n"
                         f"Waiting {int(PREVIEW_DELAY_SECONDS)}s before next request...\n"
-                        f"(Batch mode is faster, this delay ensures stability)"
+                        f"(Batch mode is faster, this delay ensures stability)\n\n"
+                        f"{key_info}"
                     )
                     # Process events to keep UI responsive during delay
                     from aqt.qt import QApplication
@@ -1777,11 +1823,16 @@ class DeckOperationDialog(QDialog):
                     if progress.wasCanceled():
                         break
                 
-                # Update progress text
+                # Update progress text with key info
+                current_key_num = self._key_manager.get_current_key_index() + 1
+                current_key_id = self._key_manager.get_current_key_id() or "--"
+                key_info = f"🔑 API Key: {current_key_id} (key {current_key_num}/{total_keys})"
+                
                 progress.setLabelText(
                     f"⏳ Preview Mode (Safe Testing)\n\n"
                     f"Generating preview ({i+1}/{sample_size})...\n"
-                    f"(Batch mode processes multiple items faster)"
+                    f"(Batch mode processes multiple items faster)\n\n"
+                    f"{key_info}"
                 )
                 
                 note = self._mw.col.get_note(nid)
@@ -2045,6 +2096,7 @@ class DeckOperationDialog(QDialog):
         self._progress_label.setText(f"{i + 1} / {total}")
         self._status_label.setText(f"Processing: {word[:20]}...")
         self._update_eta(i + 1, total)
+        self._update_api_key_status()
     
     def _process_single_sentence(
         self, note_data: Dict, generator, language: str, translation_language: str,
@@ -2277,6 +2329,7 @@ class DeckOperationDialog(QDialog):
         self._progress_label.setText(f"{i + 1} / {total}")
         self._status_label.setText(f"Generating image: {word[:20]}...")
         self._update_eta(i + 1, total)
+        self._update_api_key_status()
     
     def _process_single_image(
         self, note_data: Dict, style: str, image_gen, prompt_gen, media_mgr, image_field: str
