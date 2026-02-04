@@ -24,6 +24,7 @@ from ..core.logger import StellaLogger
 from ..core.api_key_manager import get_api_key_manager
 from ..core.gemini_client import get_gemini_client, GeminiError
 from ..core.utils import strip_html, classify_error, ErrorType, highlight_word
+from ..core.preview_models import PreviewResult
 from ..config.prompts import get_sentence_prompt, SENTENCE_SYSTEM_PROMPT
 
 
@@ -135,6 +136,61 @@ class SentenceGenerator:
         op = QueryOp(parent=parent_widget, op=background_operation, success=on_success)
         op.failure(on_failure).with_progress("Generating sentence...").run_in_background()
     
+    def generate_sentence_preview(
+        self,
+        note: Note,
+        expression_field: str,
+        sentence_field: str,
+        target_language: str,
+        difficulty: str = "Normal",
+        highlight: bool = True,
+        model_name: str = "gemini-2.5-flash",
+    ) -> PreviewResult:
+        """
+        Generate a sentence preview without updating the note.
+        
+        Returns:
+            PreviewResult object
+        """
+        if not self._key_manager.get_current_key():
+            return PreviewResult(
+                note_id=note.id,
+                original_text=strip_html(note[expression_field]) if expression_field in note else "",
+                generated_content="Error: No API key available",
+                target_field=sentence_field,
+                error="No API key available"
+            )
+            
+        word = self._extract_word_from_note(note, expression_field)
+        
+        try:
+            sentence_data = self._generate_sentence(
+                word=word, target_language=target_language,
+                difficulty=difficulty, model_name=model_name
+            )
+            
+            result_sentence, result_translation = self._apply_sentence_highlighting(
+                sentence_data, word, highlight
+            )
+            
+            return PreviewResult(
+                note_id=note.id,
+                original_text=word,
+                generated_content=result_sentence,
+                target_field=sentence_field,
+                secondary_content=result_translation,
+                secondary_field="Translation"
+            )
+            
+        except Exception as e:
+            return PreviewResult(
+                note_id=note.id,
+                original_text=word,
+                generated_content=f"Error: {str(e)}",
+                target_field=sentence_field,
+                error=str(e)
+            )
+
     def _update_note_with_sentence(
         self, note: Note, sentence_field: str, translation_field: str,
         result: Tuple[str, str], success_callback: Optional[Callable[[], None]],

@@ -39,6 +39,7 @@ if TYPE_CHECKING:
 from ..core.logger import get_logger
 from ..core.api_key_manager import APIKeyManager
 from ..core.utils import classify_error
+from ..core.preview_models import PreviewResult
 from ..config.settings import ConfigManager
 
 
@@ -209,7 +210,60 @@ class ImageGenerator:
                 time.sleep(self.retry_delay)
         
         return self._finalize_failure(word, prompt, last_error, start_time)
-    
+
+    def generate_image_preview(
+        self,
+        note: Note,
+        prompt: str,
+        image_field: str,
+        word: Optional[str] = None
+    ) -> PreviewResult:
+        """
+        Generate an image preview without saving to Anki media.
+        Saves to a temporary file instead.
+        
+        Returns:
+            PreviewResult containing path to temp file
+        """
+        word = word or "unknown"
+        
+        # Reuse existing generation logic
+        result = self.generate_image(prompt, word)
+        
+        if not result.success:
+             return PreviewResult(
+                note_id=note.id,
+                original_text=word,
+                generated_content="Image Generation Failed",
+                target_field=image_field,
+                is_image=True,
+                error=result.error
+            )
+            
+        # Success - write to temp file
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
+                tf.write(result.image_data)
+                temp_path = tf.name
+                
+            return PreviewResult(
+                note_id=note.id,
+                original_text=word,
+                generated_content="[Image Generated]",
+                target_field=image_field,
+                is_image=True,
+                temp_image_path=temp_path
+            )
+        except Exception as e:
+            return PreviewResult(
+                note_id=note.id,
+                original_text=word,
+                generated_content="Error saving text file",
+                target_field=image_field,
+                is_image=True,
+                error=f"File error: {str(e)}"
+            )
+
     def _attempt_image_generation(
         self, prompt: str, word: str, attempt: int, start_time: float
     ) -> ImageGenerationResult:

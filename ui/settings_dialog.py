@@ -30,6 +30,7 @@ from aqt.utils import showInfo, showWarning, askUser
 
 from ..core.logger import get_logger
 from ..core.api_key_manager import get_api_key_manager
+from ..core.preview_models import PreviewResult
 from ..config.settings import ConfigManager
 from ..sentence.progress_state import ProgressStateManager
 
@@ -404,6 +405,11 @@ class DeckOperationDialog(QDialog):
         # Action buttons
         button_row = QHBoxLayout()
         
+        self._translate_preview_btn = QPushButton("🧪 Preview (3)")
+        self._translate_preview_btn.setToolTip("Test translation on 3 random cards")
+        self._translate_preview_btn.clicked.connect(lambda: self._run_preview("translation"))
+        button_row.addWidget(self._translate_preview_btn)
+
         self._translate_btn = QPushButton("▶ Start Translation")
         self._translate_btn.setStyleSheet(STYLE_PRIMARY_BTN)
         self._translate_btn.clicked.connect(self._start_translation)
@@ -576,6 +582,11 @@ class DeckOperationDialog(QDialog):
         # Action buttons
         button_row = QHBoxLayout()
         
+        self._sentence_preview_btn = QPushButton("🧪 Preview (3)")
+        self._sentence_preview_btn.setToolTip("Test generation on 3 random cards")
+        self._sentence_preview_btn.clicked.connect(lambda: self._run_preview("sentence"))
+        button_row.addWidget(self._sentence_preview_btn)
+
         self._sentence_btn = QPushButton("▶ Generate Sentences")
         self._sentence_btn.setStyleSheet(STYLE_PRIMARY_BTN)
         self._sentence_btn.clicked.connect(self._start_sentence_generation)
@@ -689,6 +700,11 @@ class DeckOperationDialog(QDialog):
         
         # Action buttons
         button_row = QHBoxLayout()
+        
+        self._image_preview_btn = QPushButton("🧪 Preview (3)")
+        self._image_preview_btn.setToolTip("Test generation on 3 random cards")
+        self._image_preview_btn.clicked.connect(lambda: self._run_preview("image"))
+        button_row.addWidget(self._image_preview_btn)
         
         self._image_btn = QPushButton("▶ Generate Images")
         self._image_btn.setStyleSheet(STYLE_PRIMARY_BTN)
@@ -1105,6 +1121,280 @@ class DeckOperationDialog(QDialog):
         clean = re.sub(r'<[^>]+>', '', text)
         return clean.strip()
     
+    # ========== Preview Operations ==========
+    
+    def _get_sample_notes(self, operation_type: str, count: int = 3) -> List:
+        """
+        Get sample notes for preview operation.
+        
+        Prioritizes notes with empty target fields to simulate real work.
+        
+        Args:
+            operation_type: "translation", "sentence", or "image"
+            count: Number of samples to return
+            
+        Returns:
+            List of Anki Note objects
+        """
+        import random
+        
+        if not self._current_deck:
+            return []
+        
+        # Get all notes from the deck
+        deck_id = mw.col.decks.id(self._current_deck)
+        card_ids = mw.col.decks.cids(deck_id, children=True)
+        note_ids = list(set(mw.col.get_card(cid).nid for cid in card_ids))
+        
+        if not note_ids:
+            return []
+        
+        # Get field settings based on operation type
+        if operation_type == "translation":
+            source_field = self._source_dropdown.currentText()
+            skip_field = self._dest_dropdown.currentText()
+        elif operation_type == "sentence":
+            source_field = self._sentence_word_dropdown.currentText()
+            skip_field = self._sentence_field_dropdown.currentText()
+        elif operation_type == "image":
+            source_field = self._image_word_dropdown.currentText()
+            skip_field = self._image_field_dropdown.currentText()
+        else:
+            return []
+        
+        # Categorize notes: prefer empty target fields
+        empty_target_notes = []
+        filled_target_notes = []
+        
+        for nid in note_ids:
+            note = mw.col.get_note(nid)
+            
+            # Skip if source field is empty
+            if source_field not in note or not note[source_field].strip():
+                continue
+            
+            # Categorize by target field content
+            if skip_field in note and note[skip_field].strip():
+                filled_target_notes.append(note)
+            else:
+                empty_target_notes.append(note)
+        
+        # Prefer notes with empty targets, but include some with content if needed
+        sample_pool = empty_target_notes if empty_target_notes else filled_target_notes
+        
+        # Random selection
+        if len(sample_pool) <= count:
+            return sample_pool
+        
+        return random.sample(sample_pool, count)
+    
+    def _run_preview(self, operation_type: str) -> None:
+        """
+        Run preview workflow for specified operation.
+        
+        Args:
+            operation_type: "translation", "sentence", or "image"
+        """
+        from .preview_dialog import PreviewDialog
+        from ..translation.translator import Translator
+        from ..sentence.sentence_generator import SentenceGenerator
+        from ..image.image_generator import ImageGenerator
+        from ..image.prompt_generator import PromptGenerator
+        
+        # Validate API key
+        if not self._validate_api_key():
+            return
+        
+        # Get sample notes
+        sample_notes = self._get_sample_notes(operation_type, count=3)
+        
+        if not sample_notes:
+            showWarning(
+                "No suitable cards found for preview.\n"
+                "Please make sure the deck has cards with content in the source field."
+            )
+            return
+        
+        # Show "generating" status
+        self._status_label.setText(f"Generating {len(sample_notes)} previews...")
+        self._progress_bar.setRange(0, len(sample_notes))
+        self._progress_bar.setValue(0)
+        
+        # Generate previews
+        results: List[PreviewResult] = []
+        
+        try:
+            for i, note in enumerate(sample_notes):
+                self._progress_bar.setValue(i)
+                self._status_label.setText(f"Generating preview {i+1}/{len(sample_notes)}...")
+                
+                # Process based on operation type
+                if operation_type == "translation":
+                    result = self._generate_translation_preview(note)
+                elif operation_type == "sentence":
+                    result = self._generate_sentence_preview(note)
+                elif operation_type == "image":
+                    result = self._generate_image_preview(note)
+                else:
+                    continue
+                
+                results.append(result)
+                
+                # Small delay between API calls to respect rate limits
+                if i < len(sample_notes) - 1:
+                    import time
+                    time.sleep(1.0)
+        
+        except Exception as e:
+            logger.error(f"Preview generation error: {e}")
+            showWarning(f"Preview generation failed:\n{str(e)}")
+            self._status_label.setText("Preview failed")
+            self._progress_bar.setValue(0)
+            return
+        
+        self._progress_bar.setValue(len(sample_notes))
+        self._status_label.setText("Preview ready")
+        
+        # Show preview dialog
+        dialog = PreviewDialog(self, results)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # User approved - apply the previewed results
+            self._apply_preview_results(results, operation_type)
+            showInfo(f"Applied {len(results)} preview results.\nYou can now start the full batch.")
+        else:
+            # User cancelled - cleanup temp files
+            for result in results:
+                result.cleanup()
+            self._status_label.setText("Preview cancelled")
+    
+    def _generate_translation_preview(self, note) -> PreviewResult:
+        """Generate a translation preview for a single note."""
+        from ..translation.translator import Translator
+        
+        translator = Translator(self._addon_dir)
+        
+        source_field = self._source_dropdown.currentText()
+        context_field = self._context_dropdown.currentText()
+        dest_field = self._dest_dropdown.currentText()
+        target_language = self._language_dropdown.currentText()
+        model_name = self._model_dropdown.currentText()
+        
+        # Handle "None" context field
+        if context_field == TEXT_NONE_OPTION:
+            context_field = ""
+        
+        return translator.translate_note_preview(
+            note=note,
+            source_field=source_field,
+            context_field=context_field,
+            destination_field=dest_field,
+            target_language=target_language,
+            model_name=model_name
+        )
+    
+    def _generate_sentence_preview(self, note) -> PreviewResult:
+        """Generate a sentence preview for a single note."""
+        from ..sentence.sentence_generator import SentenceGenerator
+        
+        generator = SentenceGenerator(self._addon_dir)
+        
+        expression_field = self._sentence_word_dropdown.currentText()
+        sentence_field = self._sentence_field_dropdown.currentText()
+        target_language = self._sentence_lang_dropdown.currentText()
+        difficulty = self._difficulty_dropdown.currentText()
+        highlight = self._highlight_cb.isChecked()
+        
+        return generator.generate_sentence_preview(
+            note=note,
+            expression_field=expression_field,
+            sentence_field=sentence_field,
+            target_language=target_language,
+            difficulty=difficulty,
+            highlight=highlight
+        )
+    
+    def _generate_image_preview(self, note) -> PreviewResult:
+        """Generate an image preview for a single note."""
+        from ..image.image_generator import ImageGenerator
+        from ..image.prompt_generator import PromptGenerator
+        
+        word_field = self._image_word_dropdown.currentText()
+        image_field = self._image_field_dropdown.currentText()
+        style = self._style_dropdown.currentText()
+        custom_prompts = self._config_manager.config.image.custom_prompts
+        
+        # Get word from note
+        word = note[word_field].strip() if word_field in note else ""
+        
+        if not word:
+            return PreviewResult(
+                note_id=note.id,
+                original_text="",
+                generated_content="Error: Empty word field",
+                target_field=image_field,
+                is_image=True,
+                error="Word field is empty"
+            )
+        
+        # Generate prompt
+        prompt_generator = PromptGenerator(custom_prompts)
+        prompt = prompt_generator.generate_prompt(word, style)
+        
+        # Generate image
+        generator = ImageGenerator(self._key_manager)
+        
+        return generator.generate_image_preview(
+            note=note,
+            prompt=prompt,
+            image_field=image_field,
+            word=word
+        )
+    
+    def _apply_preview_results(self, results: List[PreviewResult], operation_type: str) -> None:
+        """
+        Apply accepted preview results to notes.
+        
+        Args:
+            results: List of PreviewResult objects
+            operation_type: "translation", "sentence", or "image"
+        """
+        for result in results:
+            if result.error:
+                # Skip failed results
+                continue
+            
+            try:
+                note = mw.col.get_note(result.note_id)
+                
+                if result.is_image and result.temp_image_path:
+                    # Handle image: move from temp to Anki media
+                    import os
+                    if os.path.exists(result.temp_image_path):
+                        # Add to Anki media collection
+                        filename = mw.col.media.add_file(result.temp_image_path)
+                        note[result.target_field] = f'<img src="{filename}">'
+                        
+                        # Clean up temp file
+                        result.cleanup()
+                else:
+                    # Handle text content
+                    note[result.target_field] = result.generated_content
+                    
+                    # Handle secondary content (e.g., sentence translation)
+                    if result.secondary_content and result.secondary_field:
+                        # Find the actual field name in the note
+                        if operation_type == "sentence":
+                            trans_field = self._sentence_trans_dropdown.currentText()
+                            if trans_field in note:
+                                note[trans_field] = result.secondary_content
+                
+                mw.col.update_note(note)
+                logger.info(f"Applied preview result to note {result.note_id}")
+                
+            except Exception as e:
+                logger.error(f"Failed to apply preview result to note {result.note_id}: {e}")
+    
     # ========== Translation Operations ==========
     
     def _start_translation(self) -> None:
@@ -1308,6 +1598,256 @@ class DeckOperationDialog(QDialog):
         self._pause_btn.setEnabled(False)
         self._global_stop_btn.setEnabled(False)
         self._eta_label.setText("ETA: --")
+    
+    # ========== Preview Features ==========
+
+    def _run_preview(self, mode: str) -> None:
+        """Run preview for the specified mode (sentence, translation, image)."""
+        import random
+        import time
+        import os
+        from ..ui.preview_dialog import PreviewDialog
+        from .main_controller import StellaAnkiTools
+        from aqt.qt import QProgressDialog, Qt
+        
+        # 1. Validation & Setup
+        if not self._validate_api_key():
+            return
+            
+        controller = StellaAnkiTools(self._mw)
+        source_field = ""
+        param_dict = {}
+        
+        # Determine fields and params based on mode
+        if mode == "sentence":
+            source_field = self._sentence_word_dropdown.currentText()
+            target_field = self._sentence_field_dropdown.currentText()
+            trans_field_name = self._sentence_trans_dropdown.currentText()
+            
+            if not source_field or not target_field:
+                showWarning("Please select Word and Sentence fields first.")
+                return
+                
+            param_dict = {
+                "sentence_field": target_field,
+                "translation_field": trans_field_name,
+                "target_language": self._sentence_lang_dropdown.currentText(),
+                "difficulty": self._difficulty_dropdown.currentText(),
+                "highlight": self._highlight_cb.isChecked()
+            }
+        elif mode == "translation":
+            source_field = self._source_dropdown.currentText()
+            context_field = self._context_dropdown.currentText()
+            target_field = self._dest_dropdown.currentText()
+            
+            if not source_field or not target_field:
+                showWarning("Please select Source and Destination fields first.")
+                return
+                
+            param_dict = {
+                "source_field": source_field,
+                "context_field": context_field,
+                "destination_field": target_field,
+                "target_language": self._language_dropdown.currentText(),
+                "model_name": self._model_dropdown.currentText()
+            }
+        elif mode == "image":
+            source_field = self._image_word_dropdown.currentText()
+            target_field = self._image_field_dropdown.currentText()
+            
+            if not source_field or not target_field:
+                showWarning("Please select Word and Image fields first.")
+                return
+                
+            current_style = self._style_dropdown.currentText()
+            param_dict = {
+                "image_field": target_field,
+                "style": current_style,
+                "custom_prompt": self._prompt_edit.toPlainText()
+            }
+        else:
+            return
+
+        # 2. Collect Sample Notes
+        skip_field = target_field
+        # Logic to skip already filled cards if possible, to show real generation
+        skip_if_filled = True
+        
+        if mode == "sentence" and not self._skip_sentence_cb.isChecked(): skip_if_filled = False
+        elif mode == "translation" and not self._skip_existing_cb.isChecked(): skip_if_filled = False
+        elif mode == "image" and not self._skip_image_cb.isChecked(): skip_if_filled = False
+        
+        check_skip = skip_field if skip_if_filled else None
+             
+        notes_data = self._collect_notes_from_deck(
+            source_field=source_field,
+            skip_if_has_content_in=check_skip
+        )
+        
+        # Fallback: if no empty cards found but we want to preview, try allowing filled cards
+        if not notes_data and skip_if_filled:
+             notes_data = self._collect_notes_from_deck(
+                source_field=source_field,
+                skip_if_has_content_in=None
+            )
+        
+        if not notes_data:
+            showWarning("No suitable cards found for preview in the current deck.")
+            return
+            
+        # Sample 3 random notes
+        sample_size = min(3, len(notes_data))
+        sample_notes_data = random.sample(notes_data, sample_size)
+        sample_nids = [d['parsed_nid'] for d in sample_notes_data]
+        
+        # 3. Generate Previews (Blocking with Progress Dialog)
+        progress = QProgressDialog("Generating previews...", "Cancel", 0, sample_size, self)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setValue(0)
+        
+        results = []
+        
+        try:
+            for i, nid in enumerate(sample_nids):
+                if progress.wasCanceled():
+                    break
+                
+                # Update progress text
+                progress.setLabelText(f"Generating preview ({i+1}/{sample_size})...")
+                
+                note = self._mw.col.get_note(nid)
+                
+                if mode == "sentence":
+                    res = controller.sentence_generator.generate_sentence_preview(
+                        note=note,
+                        expression_field=source_field,
+                        sentence_field=param_dict["sentence_field"],
+                        target_language=param_dict["target_language"],
+                        difficulty=param_dict["difficulty"],
+                        highlight=param_dict["highlight"]
+                    )
+                    # Manually add secondary field LABEL if successful
+                    if res.secondary_content and param_dict["translation_field"]:
+                         res.secondary_field = param_dict["translation_field"]
+                    results.append(res)
+                    
+                elif mode == "translation":
+                    res = controller.translator.translate_note_preview(
+                        note=note,
+                        source_field=param_dict["source_field"],
+                        context_field=param_dict.get("context_field"),
+                        destination_field=param_dict["destination_field"],
+                        target_language=param_dict["target_language"],
+                        model_name=param_dict["model_name"]
+                    )
+                    results.append(res)
+                    
+                elif mode == "image":
+                    # Generate prompt
+                    style = param_dict["style"]
+                    custom_prompt = param_dict["custom_prompt"]
+                    word = note[source_field]
+                    
+                    prompt_result = controller.prompt_generator.generate_prompt(
+                        word=word, 
+                        style=style, 
+                        custom_instructions=custom_prompt
+                    )
+                    
+                    if not prompt_result.success:
+                         final_prompt_str = f"{word}, {style} style" 
+                    else:
+                         final_prompt_str = prompt_result.prompt
+                    
+                    res = controller.image_generator.generate_image_preview(
+                        note,
+                        prompt=final_prompt_str,
+                        image_field=param_dict["image_field"],
+                        word=word
+                    )
+                    results.append(res)
+                
+                progress.setValue(i + 1)
+                
+        except Exception as e:
+            # Cleanup any already generated
+            for r in results: r.cleanup()
+            showWarning(f"Preview generation failed: {e}")
+            return
+        finally:
+            progress.setValue(sample_size)
+            
+        if progress.wasCanceled():
+            for r in results: r.cleanup()
+            return
+            
+        if not results:
+            return
+
+        # 4. Show Preview Dialog
+        dialog = PreviewDialog(self, results)
+        if dialog.exec():
+            # Apply Changes
+            self._apply_preview_results(results, mode)
+        else:
+            pass
+
+    def _apply_preview_results(self, results: List[PreviewResult], mode: str) -> None:
+        """Apply the accepted preview results to the actual notes."""
+        import os
+        import time
+        import shutil
+        from ..core.utils import clean_filename
+        
+        applied_count = 0
+        self._mw.checkpoint("Stella Preview Apply")
+        self._mw.progress.start()
+        
+        try:
+            for res in results:
+                if res.error:
+                    continue
+                    
+                note = self._mw.col.get_note(res.note_id)
+                
+                if res.is_image:
+                     # Move temp file to media
+                     if res.temp_image_path and os.path.exists(res.temp_image_path):
+                        # Simple filename generation
+                        safe_word = "".join(x for x in res.original_text if x.isalnum())[:15]
+                        filename = f"stella_img_{safe_word}_{int(time.time()*1000)}.png"
+                        
+                        # Copy to media folder
+                        media_path = os.path.join(self._mw.col.media.dir(), filename)
+                        shutil.copy(res.temp_image_path, media_path)
+                        
+                        # Write to note
+                        note[res.target_field] = f'<img src="{filename}">'
+                     
+                else:
+                    # Text content
+                    note[res.target_field] = str(res.generated_content)
+                    
+                    # Secondary (e.g. translation for sentence)
+                    if res.secondary_content and res.secondary_field:
+                         note[res.secondary_field] = res.secondary_content
+
+                self._mw.col.update_note(note)
+                applied_count += 1
+                
+                # Cleanup temp files
+                res.cleanup()
+            
+            # Show toast or status
+            from aqt.utils import tooltip
+            tooltip(f"Applied {applied_count} preview results.")
+            
+        except Exception as e:
+            showWarning(f"Error applying preview results: {e}")
+        finally:
+            self._mw.progress.finish()
+            self._mw.reset()
     
     # ========== Sentence Generation ==========
     

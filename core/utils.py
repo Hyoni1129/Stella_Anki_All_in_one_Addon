@@ -89,6 +89,18 @@ def strip_html(html_content: str) -> str:
     return text.strip()
 
 
+def clean_filename(text: str) -> str:
+    """
+    Clean text for use in filenames.
+    Removes invalid characters and spaces.
+    """
+    # Replace spaces with underscores
+    text = text.replace(" ", "_")
+    # Keep only alphanumeric, underscores, hyphens
+    text = re.sub(r'[^a-zA-Z0-9_\-]', '', text)
+    return text[:50]  # Limit length
+
+
 def classify_error(error: Exception) -> Tuple[ErrorType, str]:
     """
     Classify an exception into an error type.

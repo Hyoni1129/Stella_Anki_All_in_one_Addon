@@ -24,6 +24,7 @@ from ..core.logger import StellaLogger
 from ..core.api_key_manager import get_api_key_manager
 from ..core.gemini_client import get_gemini_client, GeminiError
 from ..core.utils import strip_html, classify_error, ErrorType
+from ..core.preview_models import PreviewResult
 from ..config.prompts import get_translation_prompt, TRANSLATION_SYSTEM_PROMPT
 
 
@@ -117,6 +118,54 @@ class Translator:
         
         op = QueryOp(parent=parent_widget, op=background_operation, success=on_success)
         op.failure(on_failure).with_progress("Generating translation...").run_in_background()
+    
+    def translate_note_preview(
+        self,
+        note: Note,
+        source_field: str,
+        context_field: str,
+        destination_field: str,
+        target_language: str,
+        model_name: str = "gemini-2.5-flash",
+    ) -> PreviewResult:
+        """
+        Generate a translation preview without updating the note.
+        
+        Returns:
+            PreviewResult object with generated translation
+        """
+        if not self._key_manager.get_current_key():
+            return PreviewResult(
+                note_id=note.id,
+                original_text=strip_html(note[source_field]) if source_field in note else "",
+                generated_content="Error: No API key available",
+                target_field=destination_field,
+                error="No API key available"
+            )
+            
+        word, context = self._extract_word_and_context(note, source_field, context_field)
+        
+        try:
+            translation = self._generate_translation(
+                word=word, context=context,
+                target_language=target_language, model_name=model_name
+            )
+            
+            return PreviewResult(
+                note_id=note.id,
+                original_text=word,
+                generated_content=translation,
+                target_field=destination_field
+            )
+            
+        except Exception as e:
+            return PreviewResult(
+                note_id=note.id,
+                original_text=word,
+                generated_content=f"Error: {str(e)}",
+                target_field=destination_field,
+                error=str(e)
+            )
     
     def _update_note_with_translation(
         self,
