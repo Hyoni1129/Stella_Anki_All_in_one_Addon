@@ -1698,7 +1698,7 @@ class DeckOperationDialog(QDialog):
         # Sample 3 random notes
         sample_size = min(3, len(notes_data))
         sample_notes_data = random.sample(notes_data, sample_size)
-        sample_nids = [d['parsed_nid'] for d in sample_notes_data]
+        sample_nids = [d['note_id'] for d in sample_notes_data]
         
         # 3. Generate Previews (Blocking with Progress Dialog)
         progress = QProgressDialog("Generating previews...", "Cancel", 0, sample_size, self)
