@@ -430,35 +430,55 @@ class DeckOperationDialog(QDialog):
         header.setStyleSheet(STYLE_HEADER)
         layout.addWidget(header)
         
-        info = QLabel("Generates example sentences for vocabulary cards.")
+        info = QLabel("Generates example sentences for vocabulary cards using AI.")
         info.setStyleSheet("color: gray;")
         layout.addWidget(info)
         
-        # Field mappings
+        # Field mappings with descriptions
         fields_group = QGroupBox(TEXT_FIELD_MAPPING)
         fields_layout = QVBoxLayout(fields_group)
         
+        # Help text for field mapping
+        field_help = QLabel(
+            "💡 <b>Word Field:</b> The vocabulary word to create a sentence for.<br>"
+            "<b>Sentence Field:</b> Where the generated sentence will be saved.<br>"
+            "<b>Translation Field:</b> Where the sentence translation will be saved."
+        )
+        field_help.setStyleSheet("color: #555; font-size: 11px; padding: 4px; background-color: #f5f5f5; border-radius: 4px;")
+        field_help.setWordWrap(True)
+        fields_layout.addWidget(field_help)
+        
         # Expression field (word)
         expr_row = QHBoxLayout()
-        expr_row.addWidget(QLabel("Word Field:"))
+        word_label = QLabel("Word Field:")
+        word_label.setToolTip("Select the field containing the vocabulary word.")
+        expr_row.addWidget(word_label)
         self._sentence_word_dropdown = QComboBox()
         self._sentence_word_dropdown.setEnabled(False)
+        self._sentence_word_dropdown.setToolTip("The field containing vocabulary words to use in sentences.")
         expr_row.addWidget(self._sentence_word_dropdown, 1)
         fields_layout.addLayout(expr_row)
         
         # Sentence field
         sent_row = QHBoxLayout()
-        sent_row.addWidget(QLabel("Sentence Field:"))
+        sent_label = QLabel("Sentence Field:")
+        sent_label.setToolTip("Select the field where the generated sentence will be saved.")
+        sent_row.addWidget(sent_label)
         self._sentence_field_dropdown = QComboBox()
         self._sentence_field_dropdown.setEnabled(False)
+        self._sentence_field_dropdown.setToolTip("The AI-generated example sentence will be saved here.")
         sent_row.addWidget(self._sentence_field_dropdown, 1)
         fields_layout.addLayout(sent_row)
         
         # Translation field
         trans_row = QHBoxLayout()
-        trans_row.addWidget(QLabel("Translation Field:"))
+        trans_label = QLabel("Translation Field:")
+        trans_label.setToolTip("Select the field where the sentence translation will be saved.\\n"
+                               "This will contain the sentence meaning in your Translation Language.")
+        trans_row.addWidget(trans_label)
         self._sentence_trans_dropdown = QComboBox()
         self._sentence_trans_dropdown.setEnabled(False)
+        self._sentence_trans_dropdown.setToolTip("The sentence translation in your native language will be saved here.")
         trans_row.addWidget(self._sentence_trans_dropdown, 1)
         fields_layout.addLayout(trans_row)
         
@@ -472,20 +492,63 @@ class DeckOperationDialog(QDialog):
         options_group = QGroupBox("Options")
         options_layout = QVBoxLayout(options_group)
         
-        # Language
+        # Help text explaining language settings
+        lang_help = QLabel(
+            "💡 <b>Example:</b> If you're a Korean speaker learning English words:<br>"
+            "&nbsp;&nbsp;&nbsp;• <b>Sentence Language:</b> English (sentences will be in English)<br>"
+            "&nbsp;&nbsp;&nbsp;• <b>Translation Language:</b> Korean (translations will be in Korean)"
+        )
+        lang_help.setStyleSheet("color: #555; font-size: 11px; padding: 6px; background-color: #e8f4f8; border-radius: 4px;")
+        lang_help.setWordWrap(True)
+        options_layout.addWidget(lang_help)
+        
+        # Sentence Language - The language in which the example sentence will be generated
         lang_row = QHBoxLayout()
-        lang_row.addWidget(QLabel("Sentence Language:"))
+        lang_label = QLabel("Sentence Language:")
+        lang_label.setToolTip("The language for the generated example sentence.\n"
+                              "Example: If you're learning Korean, select 'Korean' to get\n"
+                              "Korean example sentences using your vocabulary words.")
+        lang_row.addWidget(lang_label)
         self._sentence_lang_dropdown = QComboBox()
         self._sentence_lang_dropdown.setEditable(True)
         self._sentence_lang_dropdown.addItems([
-            "Korean", "Japanese", "Chinese (Simplified)", "Spanish",
-            "French", "German", "Italian", "Portuguese"
+            "English", "Korean", "Japanese", "Chinese (Simplified)", "Chinese (Traditional)",
+            "Spanish", "French", "German", "Italian", "Portuguese", "Russian",
+            "Vietnamese", "Thai", "Indonesian", "Arabic", "Hindi"
         ])
         self._sentence_lang_dropdown.setCurrentText(
             self._config_manager.config.sentence.target_language
         )
+        self._sentence_lang_dropdown.setToolTip(
+            "Select the language for the generated example sentences.\n"
+            "This is the language you are learning."
+        )
         lang_row.addWidget(self._sentence_lang_dropdown, 1)
         options_layout.addLayout(lang_row)
+        
+        # Translation Language - The language for sentence translation (user's native language)
+        trans_lang_row = QHBoxLayout()
+        trans_lang_label = QLabel("Translation Language:")
+        trans_lang_label.setToolTip("Your native language for understanding the generated sentences.\n"
+                                    "Example: If you're a Korean speaker learning English,\n"
+                                    "select 'Korean' to get Korean translations of the English sentences.")
+        trans_lang_row.addWidget(trans_lang_label)
+        self._translation_lang_dropdown = QComboBox()
+        self._translation_lang_dropdown.setEditable(True)
+        self._translation_lang_dropdown.addItems([
+            "English", "Korean", "Japanese", "Chinese (Simplified)", "Chinese (Traditional)",
+            "Spanish", "French", "German", "Italian", "Portuguese", "Russian",
+            "Vietnamese", "Thai", "Indonesian", "Arabic", "Hindi"
+        ])
+        self._translation_lang_dropdown.setCurrentText(
+            getattr(self._config_manager.config.sentence, 'translation_language', 'English')
+        )
+        self._translation_lang_dropdown.setToolTip(
+            "Select your native language for sentence translations.\n"
+            "The Translation Field will contain the sentence meaning in this language."
+        )
+        trans_lang_row.addWidget(self._translation_lang_dropdown, 1)
+        options_layout.addLayout(trans_lang_row)
         
         # Difficulty
         diff_row = QHBoxLayout()
@@ -1298,6 +1361,7 @@ class DeckOperationDialog(QDialog):
         total = len(notes_data)
         
         language = self._sentence_lang_dropdown.currentText()
+        translation_language = self._translation_lang_dropdown.currentText()
         difficulty = self._difficulty_dropdown.currentText()
         highlight = self._highlight_cb.isChecked()
         
@@ -1309,8 +1373,8 @@ class DeckOperationDialog(QDialog):
         
         # Process notes
         success, failure = self._process_sentence_notes(
-            notes_data, total, generator, language, difficulty, highlight,
-            sentence_field, trans_field, resume_ids
+            notes_data, total, generator, language, translation_language, 
+            difficulty, highlight, sentence_field, trans_field, resume_ids
         )
         
         # Cleanup
@@ -1329,7 +1393,7 @@ class DeckOperationDialog(QDialog):
     
     def _process_sentence_notes(
         self, notes_data: List[Dict], total: int, generator,
-        language: str, difficulty: str, highlight: bool,
+        language: str, translation_language: str, difficulty: str, highlight: bool,
         sentence_field: str, trans_field: str, resume_ids: Optional[Set[int]]
     ) -> tuple[int, int]:
         """Process all notes for sentence generation."""
@@ -1349,8 +1413,8 @@ class DeckOperationDialog(QDialog):
             QApplication.processEvents()
             
             result_success = self._process_single_sentence(
-                note_data, generator, language, difficulty, highlight,
-                sentence_field, trans_field
+                note_data, generator, language, translation_language, 
+                difficulty, highlight, sentence_field, trans_field
             )
             
             if result_success:
@@ -1370,8 +1434,8 @@ class DeckOperationDialog(QDialog):
         self._update_eta(i + 1, total)
     
     def _process_single_sentence(
-        self, note_data: Dict, generator, language: str, difficulty: str,
-        highlight: bool, sentence_field: str, trans_field: str
+        self, note_data: Dict, generator, language: str, translation_language: str,
+        difficulty: str, highlight: bool, sentence_field: str, trans_field: str
     ) -> bool:
         """Process a single note for sentence generation. Returns True on success."""
         note = note_data["note"]
@@ -1380,7 +1444,10 @@ class DeckOperationDialog(QDialog):
         
         try:
             result = generator.generate_sentence_sync(
-                word=word, target_language=language, difficulty=difficulty
+                word=word, 
+                target_language=language, 
+                translation_language=translation_language,
+                difficulty=difficulty
             )
             
             sentence = result.get("translated_sentence", "")

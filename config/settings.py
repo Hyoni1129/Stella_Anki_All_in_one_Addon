@@ -113,7 +113,14 @@ class ImageConfig:
 
 @dataclass
 class SentenceConfig:
-    """Sentence generation module configuration."""
+    """Sentence generation module configuration.
+    
+    Attributes:
+        target_language: The language for generated sentences (what user is learning).
+                         Example: "Korean" if learning Korean vocabulary.
+        translation_language: The user's native language for understanding sentences.
+                              Example: "English" if user is an English speaker.
+    """
     enabled: bool = True
     expression_field: str = "Word"
     sentence_field: str = "Sentence"
@@ -121,6 +128,7 @@ class SentenceConfig:
     difficulty: str = "Normal"
     highlight_word: bool = True
     target_language: str = "Korean"
+    translation_language: str = "English"  # User's native language for sentence translations
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SentenceConfig":
@@ -132,6 +140,7 @@ class SentenceConfig:
             difficulty=data.get("difficulty", "Normal"),
             highlight_word=data.get("highlight_word", True),
             target_language=data.get("target_language", "Korean"),
+            translation_language=data.get("translation_language", "English"),
         )
 
 

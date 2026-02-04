@@ -170,6 +170,7 @@ class SentenceGenerator:
         self,
         word: str,
         target_language: str,
+        translation_language: str = "English",
         difficulty: str = "Normal",
         model_name: str = "gemini-2.5-flash",
     ) -> Dict[str, str]:
@@ -180,7 +181,8 @@ class SentenceGenerator:
         
         Args:
             word: Word to create sentence for
-            target_language: Language for the sentence
+            target_language: Language for the sentence (the language user is learning)
+            translation_language: User's native language for sentence translation
             difficulty: Sentence complexity
             model_name: Gemini model to use
             
@@ -190,6 +192,7 @@ class SentenceGenerator:
         return self._generate_sentence(
             word=word,
             target_language=target_language,
+            translation_language=translation_language,
             difficulty=difficulty,
             model_name=model_name,
         )
@@ -198,15 +201,17 @@ class SentenceGenerator:
         self,
         word: str,
         target_language: str,
-        difficulty: str,
-        model_name: str,
+        translation_language: str = "English",
+        difficulty: str = "Normal",
+        model_name: str = "gemini-2.5-flash",
     ) -> Dict[str, str]:
         """
         Generate sentence using Gemini API.
         
         Args:
             word: Word to use in sentence
-            target_language: Target language
+            target_language: Target language for the sentence (the language being learned)
+            translation_language: User's native language for sentence translation
             difficulty: Complexity level
             model_name: Model to use
             
@@ -215,14 +220,30 @@ class SentenceGenerator:
         """
         # Build prompt with explicit JSON format request
         prompt = get_sentence_prompt(word, target_language, difficulty)
+        
+        # Create example translation based on translation language
+        if translation_language.lower() == "korean":
+            example_trans = "나는 매일 사과를 먹는 것을 좋아한다."
+            example_word = "사과"
+        elif translation_language.lower() == "japanese":
+            example_trans = "私は毎日りんごを食べるのが好きです。"
+            example_word = "りんご"
+        elif translation_language.lower() in ("chinese (simplified)", "chinese"):
+            example_trans = "我每天都喜欢吃苹果。"
+            example_word = "苹果"
+        else:
+            example_trans = "I like to eat apples every day."
+            example_word = "apples"
+        
         # Add JSON format instruction with concrete example for structured response
         json_instruction = f'''
 
 IMPORTANT: Return ONLY a valid JSON object with no markdown, no code fences, and no explanation.
-Example format for word "apple" in Spanish:
-{{"translated_sentence": "Me gusta comer manzanas todos los días.", "english_sentence": "I like to eat apples every day.", "translated_conjugated_word": "manzanas", "english_word": "apples"}}
+The "english_sentence" field should contain the translation in {translation_language}.
+Example format for word "apple" in Spanish (translated to {translation_language}):
+{{"translated_sentence": "Me gusta comer manzanas todos los días.", "english_sentence": "{example_trans}", "translated_conjugated_word": "manzanas", "english_word": "{example_word}"}}
 
-Now generate for the word "{word}" in {target_language}:'''
+Now generate for the word "{word}" in {target_language} (translate to {translation_language}):'''
         full_prompt = f"{SENTENCE_SYSTEM_PROMPT}\n\n{prompt}{json_instruction}"
         
         # Generation config (avoid unsupported response_mime_type for compatibility)
