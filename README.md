@@ -278,10 +278,6 @@ Under the following terms:
 
 - [Google Gemini](https://ai.google.dev/) - AI models powering all features
 - [Anki](https://apps.ankiweb.net/) - The amazing flashcard platform
-- Original projects that inspired this unified tool:
-  - Stella Anki Translator
-  - Anki Image Gen with Nano Banana
-  - Anki Sentence Generator (BunAI)
 
 ---
 
@@ -294,7 +290,5 @@ Under the following terms:
 [![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Hyoni1129)
 
 ---
-
-**⭐ If you find this useful, please star the repository! ⭐**
 
 </div>
